@@ -32,6 +32,7 @@ month_num = list(calendar.month_name).index(month_name)
 with st.expander("➕ Add New Event"):
     e_col1, e_col2 = st.columns(2)
     with e_col1:
+        # Default date picker to the first of the selected month/year
         event_date = st.date_input("Date", datetime(year, month_num, 1))
     with e_col2:
         event_desc = st.text_input("What's happening?")
@@ -46,44 +47,45 @@ with st.expander("➕ Add New Event"):
 st.write("---")
 
 # --- CALENDAR GRID ---
-# Weekday Headers
 days_of_week = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 header_cols = st.columns(7)
 for idx, day_head in enumerate(days_of_week):
     header_cols[idx].markdown(f"<p style='text-align:center; font-weight:bold; color:#76b372;'>{day_head}</p>", unsafe_allow_html=True)
 
-# Generate month matrix
 cal_matrix = calendar.monthcalendar(year, month_num)
 
 for week in cal_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
         if day == 0:
-            # Empty box for days not in the current month
             cols[i].markdown("<div style='height:100px;'></div>", unsafe_allow_html=True)
         else:
             with cols[i]:
-                # Every day gets a container with a border
                 with st.container(border=True):
-                    # Day number at the top
-                    st.markdown(f"<p style='margin:0; font-weight:bold;'>{day}</p>", unsafe_allow_html=True)
+                    # Day number
+                    st.markdown(f"<p style='margin:0; font-weight:bold; font-size:14px;'>{day}</p>", unsafe_allow_html=True)
                     
-                    # Date string for database query
                     current_date = f"{year}-{month_num:02d}-{day:02d}"
-                    
-                    # Fetch events for this specific box
                     events = fetch_query("SELECT id, description FROM events WHERE user_email=%s AND event_date=%s", 
                                         (st.session_state.user_email, current_date))
                     
                     if events:
                         for eid, desc in events:
-                            # Small event pills
-                            st.markdown(f"""
-                                <div style="background-color:#76b372; color:white; font-size:10px; 
-                                border-radius:3px; padding:2px 5px; margin-top:2px;">
-                                    📍 {desc}
-                                </div>
-                            """, unsafe_allow_html=True)
+                            # Inner container for the event to keep it inside the box
+                            # Styled as a small pill with a delete button
+                            ev_col, del_col = st.columns([4, 1])
+                            with ev_col:
+                                st.markdown(f"""
+                                    <div style="background-color:#76b372; color:white; font-size:10px; 
+                                    border-radius:3px; padding:2px 4px; margin-top:2px; white-space: nowrap; 
+                                    overflow: hidden; text-overflow: ellipsis;" title="{desc}">
+                                        {desc}
+                                    </div>
+                                """, unsafe_allow_html=True)
+                            with del_col:
+                                if st.button("×", key=f"dev_{eid}", help=f"Delete {desc}"):
+                                    execute_query("DELETE FROM events WHERE id=%s", (eid,))
+                                    st.rerun()
                     else:
-                        # Ensures the boxes stay a consistent height even when empty
+                        # Spacer to keep box height consistent
                         st.write("")
