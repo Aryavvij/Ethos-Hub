@@ -19,7 +19,7 @@ with st.expander("Edit Schedule (Add or Remove Classes)"):
     with col2:
         subject_input = st.text_input("Subject/Class Name")
     with col3:
-        loc_input = st.text_input("Location (Room/Link)")
+        loc_input = st.text_input("Location (Room)")
         
     if st.button("Add to Timetable"):
         if subject_input:
