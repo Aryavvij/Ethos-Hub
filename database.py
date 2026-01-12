@@ -4,14 +4,14 @@ import os
 
 def get_db_connection():
     try:
-        # Pull the full connection string from Render Environment Variables
-        # If it's not there, it uses your specific pooler URI as a fallback
-        conn_str = os.environ.get('DATABASE_URL') or "postgresql://postgres.lyquddfadowlaosrwnwb:Aryav_vij04@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
-
-        conn = psycopg2.connect(conn_str, connect_timeout=15)
+        # Use the URI with sslmode=require added to the end
+        conn_str = os.environ.get('DATABASE_URL') or "postgresql://postgres.lyquddfadowlaosrwnwb:Aryav_vij04@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
+        
+        # Adding sslmode for better cloud compatibility
+        conn = psycopg2.connect(conn_str, sslmode='require', connect_timeout=15)
         return conn
     except Exception as e:
-        st.error(f"URI Connection Failed")
+        st.error(f"Connection Failed - Tenant: lyquddfadowlaosrwnwb")
         st.error(f"Error: {e}")
         return None
         
