@@ -2,16 +2,14 @@ import psycopg2
 import streamlit as st
 import os
 
-# Function to get a connection to the Supabase cloud database
 def get_db_connection():
     try:
-        # 1. Try to get credentials from Render Environment Variables first
-        # 2. Fall back to st.secrets for local testing (Streamlit)
-        host = os.environ.get('DB_HOST') or st.secrets["postgres"]["host"]
-        port = os.environ.get('DB_PORT') or st.secrets["postgres"]["port"]
-        database = os.environ.get('DB_NAME') or st.secrets["postgres"]["database"]
-        user = os.environ.get('DB_USER') or st.secrets["postgres"]["user"]
-        password = os.environ.get('DB_PASS') or st.secrets["postgres"]["password"]
+        host = os.environ.get('DB_HOST')
+        port = os.environ.get('DB_PORT')
+        database = os.environ.get('DB_NAME')
+        # HARD-CODED USERNAME TO BYPASS RENDER DASHBOARD ERRORS
+        user = "postgres.lyquddfadowlaosrnwhdb" 
+        password = os.environ.get('DB_PASS')
 
         conn = psycopg2.connect(
             host=host,
@@ -23,9 +21,10 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        st.error(f"Could not connect to the cloud database: {e}")
+        # This will show exactly what the code is trying to use
+        st.error(f"Failed with User: {user}")
+        st.error(f"Error: {e}")
         return None
-
 # Standard function for saving data (insert/update/delete)
 def execute_query(query, params=None):
     conn = get_db_connection()
