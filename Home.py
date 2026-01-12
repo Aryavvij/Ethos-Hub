@@ -112,76 +112,82 @@ with g3:
 
 st.markdown("---")
 
-# Dashboard view of different system modules
-st.markdown("### System Status")
+# --- 3. UPDATED SYSTEM STATUS SECTION ---
+st.markdown("### Today's Focus")
 w1, w2, w3 = st.columns(3)
 
+# 1. Priorities (Weekly Tasks + Calendar Events)
 with w1:
     with st.container(border=True):
         st.markdown('<p class="card-title">📋 Today\'s Priorities</p>', unsafe_allow_html=True)
-        day_idx = (datetime.now().weekday() + 1) % 7 
-        if 'weekly_data' in st.session_state and st.session_state.weekly_data[day_idx]:
-            for task in st.session_state.weekly_data[day_idx][:3]:
-                st.markdown(f"<p class='status-text-large'>• {task['name']}</p>", unsafe_allow_html=True)
+        
+        # Determine the current day index (Monday=0)
+        today_date = datetime.now().date()
+        day_idx = today_date.weekday()
+        current_monday = today_date - timedelta(days=day_idx)
+        
+        # Pull Tasks from Weekly Planner
+        tasks = fetch_query(
+            "SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s",
+            (st.session_state.user_email, day_idx, current_monday)
+        )
+        
+        # Pull Events from Calendar
+        events = fetch_query(
+            "SELECT description FROM events WHERE user_email=%s AND event_date=%s",
+            (st.session_state.user_email, today_date)
+        )
+        
+        if not tasks and not events:
+            st.markdown("<p style='color:gray; font-size:14px;'>Nothing scheduled for today.</p>", unsafe_allow_html=True)
         else:
-            st.markdown("<p class='status-text-large' style='color:gray;'>No tasks for today.</p>", unsafe_allow_html=True)
+            # Display Calendar Events first (as alerts)
+            for ev in events:
+                st.markdown(f"**📍 EVENT: {ev[0]}**")
+            
+            # Display Weekly Tasks
+            for tname, tdone in tasks:
+                status = "✅" if tdone else "⭕"
+                st.markdown(f"<p style='font-size:14px;'>{status} {tname}</p>", unsafe_allow_html=True)
 
+# 2. Budget Snapshot (Keep existing logic)
 with w2:
     with st.container(border=True):
         st.markdown('<p class="card-title">💰 Budget Snapshot</p>', unsafe_allow_html=True)
-        
-        # DEFINED OUTSIDE: Fixes the NameError in the except block
-        current_period = datetime.now().strftime("%B %Y") 
-        
+        current_period = datetime.now().strftime("%B %Y")
         try:
-            query = """
-                SELECT 
-                    SUM(CAST(plan AS REAL)) as total_plan, 
-                    SUM(CAST(actual AS REAL)) as total_actual 
-                FROM finances 
-                WHERE period = %s
-            """
+            query = "SELECT SUM(CAST(plan AS REAL)), SUM(CAST(actual AS REAL)) FROM finances WHERE period = %s"
             result = fetch_query(query, (current_period,))
-            
             if result and result[0][0] is not None:
-                planned = float(result[0][0])
-                actual = float(result[0][1]) if result[0][1] is not None else 0.0
-                remaining = planned - actual
+                remaining = float(result[0][0]) - (float(result[0][1]) if result[0][1] else 0)
                 color = "#76b372" if remaining >= 0 else "#ff4b4b"
-                
-                st.markdown(f"""
-                    <p class='status-text-large' style='margin-top:20px;'>
-                        Remaining: <span style='color:{color}; font-weight:bold;'>Rs {remaining:,.2f}</span>
-                    </p>
-                """, unsafe_allow_html=True)
+                st.markdown(f"<p class='status-text-large' style='margin-top:20px;'>Remaining: <span style='color:{color}; font-weight:bold;'>Rs {remaining:,.2f}</span></p>", unsafe_allow_html=True)
             else:
-                st.markdown(f"<p style='color:gray; font-size:12px;'>Status: No data found for {current_period}</p>", unsafe_allow_html=True)
-                
+                st.markdown(f"<p style='color:gray; font-size:12px;'>No data for {current_period}</p>", unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"Budget Error for {current_period}: {e}")
+            st.error(f"Error: {e}")
 
+# 3. Today's Classes (Replacing Inspiration)
 with w3:
     with st.container(border=True):
-        st.markdown('<p class="card-title">💡 Daily Inspiration</p>', unsafe_allow_html=True)
-        st.text_area("Q", value="Inspiration comes only during work", height=100, label_visibility="collapsed", key="quote_in")
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# --- DANGER ZONE (Bottom of Home Page) ---
-st.markdown("---")
-with st.expander("Reset Cloud Data"):
-    st.write("This will permanently delete your data from the cloud tables. This cannot be undone.")
-    
-    confirm_text = st.text_input("Type 'DELETE' to enable the reset button")
-    
-    col_reset1, col_reset2 = st.columns(2)
-    
-    with col_reset1:
-        if st.button("Clear Weekly Planner", disabled=(confirm_text != "DELETE")):
-            execute_query("DELETE FROM weekly_planner WHERE user_email = %s", (st.session_state.user_email,))
-            st.success("Weekly tasks cleared.")
-            
-    with col_reset2:
-        if st.button("Clear Habit History", disabled=(confirm_text != "DELETE")):
-            execute_query("DELETE FROM habits WHERE user_email = %s", (st.session_state.user_email,))
-            st.success("Habit data cleared.")
+        st.markdown('<p class="card-title">🎓 Today\'s Classes</p>', unsafe_allow_html=True)
+        day_name = datetime.now().strftime("%A")
+        
+        # Fetch classes for the current day
+        classes = fetch_query(
+            "SELECT start_time, subject, location FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC",
+            (st.session_state.user_email, day_name)
+        )
+        
+        if classes:
+            for ctime, csub, cloc in classes:
+                # Format time to HH:MM
+                time_str = ctime.strftime("%H:%M")
+                st.markdown(f"""
+                    <div style="border-left: 3px solid #76b372; padding-left: 10px; margin-bottom: 8px;">
+                        <p style="margin:0; font-weight:bold; font-size:14px;">{time_str} - {csub}</p>
+                        <p style="margin:0; font-size:12px; color:gray;">📍 {cloc if cloc else 'No Location'}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown("<p style='color:gray; font-size:14px;'>No classes today. Rest up!</p>", unsafe_allow_html=True)
