@@ -3,13 +3,16 @@ import streamlit as st
 import os
 
 def get_db_connection():
+    url = os.environ.get('DATABASE_URL')
+    if not url:
+        st.error("Render Environment Variable 'DATABASE_URL' is missing!")
+        return None
+        
     try:
-        conn_str = os.environ.get('DATABASE_URL')
-        conn = psycopg2.connect(conn_str, connect_timeout=15)
+        conn = psycopg2.connect(url, connect_timeout=15)
         return conn
     except Exception as e:
-        st.error(f"Final Attempt Failed - Check if Host is aws-1 or aws-0")
-        st.error(f"Error: {e}")
+        st.error(f"Connection Error: {e}")
         return None
         
 # Standard function for saving data (insert/update/delete)
