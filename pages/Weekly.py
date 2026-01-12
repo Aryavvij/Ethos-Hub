@@ -23,21 +23,29 @@ today = datetime.now().date()
 # Automatically find the Monday of the current week to fix alignment
 default_monday = today - timedelta(days=today.weekday())
 
-c1, c2 = st.columns([1, 1])
-with c1:
-    # Users can pick a date, but it defaults to the current Monday
-    start_date = st.date_input("Week Starting On (Monday):", default_monday)
-with c2:
-    st.markdown(f'<div class="custom-view-bar"><p style="text-align:right; font-size:20px; color:gray;">Viewing: {start_date.strftime("%B %Y")}</p></div>', unsafe_allow_html=True)
+# --- ALIGNMENT FIX SECTION ---
+with st.container():
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        # Users pick a date, defaults to current Monday
+        start_date = st.date_input("Week Starting On (Monday):", default_monday)
+    with c2:
+        # Added padding-top (28px) to align precisely with the input box height
+        st.markdown(f"""
+            <div style="padding-top: 28px;">
+                <div style="background-color: #1e2129; padding: 10px; border-radius: 5px; border: 1px solid #333; text-align: center;">
+                    <p style="margin:0; color: gray; font-size: 16px;">Viewing: {start_date.strftime("%B %Y")}</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
 user = st.session_state.user_email
 
-# --- ALIGNMENT FIX: Start list with Monday ---
+# --- WEEKLY GRID ---
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
-    # Calculate the exact date for this specific column
     this_day_date = start_date + timedelta(days=i)
     
     with cols[i]:
@@ -61,7 +69,7 @@ for i, day_name in enumerate(days):
         
         st.write("---")
         
-        # Pull tasks from cloud for this specific date
+        # Pull tasks from cloud
         db_tasks = fetch_query(
             "SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", 
             (user, i, start_date)
@@ -70,15 +78,24 @@ for i, day_name in enumerate(days):
         done_count = 0
         if db_tasks:
             for tid, tname, tdone in db_tasks:
-                # Task Checkbox
-                is_checked = st.checkbox(tname, value=bool(tdone), key=f"chk_{tid}")
-                if is_checked != bool(tdone):
-                    execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (is_checked, tid))
-                    st.rerun()
-                if is_checked: 
-                    done_count += 1
+                task_col, del_col = st.columns([4, 1])
+                
+                with task_col:
+                    # Task Checkbox
+                    is_checked = st.checkbox(tname, value=bool(tdone), key=f"chk_{tid}")
+                    if is_checked != bool(tdone):
+                        execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (is_checked, tid))
+                        st.rerun()
+                    if is_checked: 
+                        done_count += 1
+                
+                with del_col:
+                    # Task Deletion
+                    if st.button("❌", key=f"del_{tid}", help="Delete Task"):
+                        execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
+                        st.rerun()
         
-        # Summary Stats for the day
+        # Summary Stats
         total_tasks = len(db_tasks)
         not_done = total_tasks - done_count
         st.markdown(f"""
