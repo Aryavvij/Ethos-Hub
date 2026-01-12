@@ -8,7 +8,7 @@ DB_USER = os.environ.get('DB_USER') or st.secrets["postgres"]["user"]
 # ... do the same for password, port, and database name
 
 # this connects us to the supabase cloud
-def get_connection():
+def get_db_connection():
     try:
         # 1. Try to get credentials from Render Environment Variables first
         # 2. Fall back to st.secrets for local testing
