@@ -4,11 +4,11 @@ import os
 
 def get_db_connection():
     try:
-        conn_str = os.environ.get('DATABASE_URL') or "postgresql://postgres.lyquddfadowlaosnwhdb:Aryav_vij04@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+        conn_str = os.environ.get('DATABASE_URL')
         conn = psycopg2.connect(conn_str, connect_timeout=15)
         return conn
     except Exception as e:
-        st.error(f"Connection Failed for ID: lyquddfadowlaosnwhdb")
+        st.error(f"Final Attempt Failed - Check if Host is aws-1 or aws-0")
         st.error(f"Error: {e}")
         return None
         
