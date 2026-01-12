@@ -4,23 +4,14 @@ import os
 
 def get_db_connection():
     try:
-        host = "db.lyquddfadowlaosrwnwb.supabase.co" 
-        port = 5432  
-        database = "postgres"
-        user = "postgres" 
-        password = os.environ.get('DB_PASS') or "Aryav_vij04"
+        # Pull the full connection string from Render Environment Variables
+        # If it's not there, it uses your specific pooler URI as a fallback
+        conn_str = os.environ.get('DATABASE_URL') or "postgresql://postgres.lyquddfadowlaosrwnwb:Aryav_vij04@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
 
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            database=database,
-            user=user,
-            password=password,
-            connect_timeout=15
-        )
+        conn = psycopg2.connect(conn_str, connect_timeout=15)
         return conn
     except Exception as e:
-        st.error(f"Direct Connection Attempt Failed")
+        st.error(f"URI Connection Failed")
         st.error(f"Error: {e}")
         return None
         
