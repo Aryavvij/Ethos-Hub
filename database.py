@@ -4,11 +4,10 @@ import os
 
 def get_db_connection():
     try:
-        host = "aws-0-ap-northeast-1.pooler.supabase.com" 
-        port = 6543
+        host = "db.lyquddfadowlaosrwnwb.supabase.co" 
+        port = 5432  
         database = "postgres"
-        user = "postgres.lyquddfadowlaosrwnwb" 
-        
+        user = "postgres" 
         password = os.environ.get('DB_PASS') or "Aryav_vij04"
 
         conn = psycopg2.connect(
@@ -21,9 +20,8 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        # This helps us see if the code is actually using the new string
-        st.error(f"Attempting connection with User: {user}")
-        st.error(f"Connection Error: {e}")
+        st.error(f"Direct Connection Attempt Failed")
+        st.error(f"Error: {e}")
         return None
         
 # Standard function for saving data (insert/update/delete)
