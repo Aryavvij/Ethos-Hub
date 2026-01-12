@@ -4,14 +4,14 @@ import os
 
 def get_db_connection():
     try:
-        # Use the URI with sslmode=require added to the end
-        conn_str = os.environ.get('DATABASE_URL') or "postgresql://postgres.lyquddfadowlaosrwnwb:Aryav_vij04@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
-        
-        # Adding sslmode for better cloud compatibility
-        conn = psycopg2.connect(conn_str, sslmode='require', connect_timeout=15)
+        # Pull the corrected URI from Render
+        conn_str = os.environ.get('DATABASE_URL') or "postgresql://postgres.lyquddfadowlaosnwhdb:Aryav_vij04@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
+
+        # Connect using the URI
+        conn = psycopg2.connect(conn_str, connect_timeout=15)
         return conn
     except Exception as e:
-        st.error(f"Connection Failed - Tenant: lyquddfadowlaosrwnwb")
+        st.error(f"Connection Failed for ID: lyquddfadowlaosnwhdb")
         st.error(f"Error: {e}")
         return None
         
