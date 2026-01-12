@@ -4,12 +4,11 @@ import os
 
 def get_db_connection():
     try:
-        host = os.environ.get('DB_HOST')
-        port = os.environ.get('DB_PORT')
-        database = os.environ.get('DB_NAME')
-        # HARD-CODED USERNAME TO BYPASS RENDER DASHBOARD ERRORS
+        host = "aws-0-ap-northeast-1.pooler.supabase.com" 
+        port = 6543
+        database = "postgres"
         user = "postgres.lyquddfadowlaosrnwhdb" 
-        password = os.environ.get('DB_PASS')
+        password = os.environ.get('DB_PASS') or "Aryav_vij04"
 
         conn = psycopg2.connect(
             host=host,
@@ -17,14 +16,14 @@ def get_db_connection():
             database=database,
             user=user,
             password=password,
-            connect_timeout=10
+            connect_timeout=15
         )
         return conn
     except Exception as e:
-        # This will show exactly what the code is trying to use
-        st.error(f"Failed with User: {user}")
-        st.error(f"Error: {e}")
+        st.error(f"Region: ap-northeast-1 | User: {user}")
+        st.error(f"Connection Error: {e}")
         return None
+        
 # Standard function for saving data (insert/update/delete)
 def execute_query(query, params=None):
     conn = get_db_connection()
