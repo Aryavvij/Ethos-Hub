@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from database import execute_query, fetch_query, get_db_connection
+from database import fetch_query, execute_query
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page to access this system.")
