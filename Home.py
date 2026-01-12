@@ -45,7 +45,7 @@ if not st.session_state.logged_in:
             if result:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
-                st.rerun()
+                st.rerun() 
             else:
                 st.error("Incorrect Email or Password")
     
