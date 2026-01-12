@@ -5,13 +5,13 @@ import pandas as pd
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.stop()
 
-st.title("🎓 My Custom Timetable")
+st.title("Weekly Timetable")
 
 user = st.session_state.user_email
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 # --- SECTION 1: ADD/EDIT CLASSES ---
-with st.expander("📝 Edit Schedule (Add or Remove Classes)"):
+with st.expander("Edit Schedule (Add or Remove Classes)"):
     col1, col2, col3 = st.columns(3)
     with col1:
         day_input = st.selectbox("Day", days)
