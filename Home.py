@@ -1,25 +1,14 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
 import hashlib
 from datetime import datetime
+from database import get_db_connection, execute_query, fetch_query
 
-# --- 1. DATABASE UTILITIES ---
-
-# setup the user table if it's missing
-def init_user_db():
-    conn = sqlite3.connect('ethos.db')
-    c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, password TEXT)')
-    conn.commit()
-    conn.close()
+# --- 1. AUTHENTICATION UTILITIES ---
 
 # hashing for security
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
-
-# check credentials against the db
-from database import get_db_connection, execute_query, fetch_query
 
 def login_user(email, password):
     # check the cloud database for this user
@@ -30,13 +19,13 @@ def login_user(email, password):
 def signup_user(email, password):
     # add a new user to the cloud
     try:
+        # Use %s for Supabase/PostgreSQL (SQLite uses ?)
         query = "INSERT INTO users (email, password) VALUES (%s, %s)"
         execute_query(query, (email, password))
         return True
-    except Exception:
+    except Exception as e:
+        st.error(f"Sign up error: {e}")
         return False
-
-init_user_db()
 
 # --- 2. AUTHENTICATION UI ---
 
