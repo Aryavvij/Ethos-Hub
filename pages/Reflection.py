@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 from datetime import datetime
+from database import fetch_query, execute_query
 
 # check for login session before showing the page
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
