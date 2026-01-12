@@ -7,7 +7,7 @@ def get_db_connection():
         host = "aws-0-ap-northeast-1.pooler.supabase.com" 
         port = 6543
         database = "postgres"
-        user = "postgres.lyquddfadowlaosrnwhdb" 
+        user = "postgres.lyquddfadowlaosnwhdb" 
         password = os.environ.get('DB_PASS') or "Aryav_vij04"
 
         conn = psycopg2.connect(
