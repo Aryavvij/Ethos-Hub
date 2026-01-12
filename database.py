@@ -7,7 +7,8 @@ def get_db_connection():
         host = "aws-0-ap-northeast-1.pooler.supabase.com" 
         port = 6543
         database = "postgres"
-        user = "postgres.lyquddfadowlaosnwhdb" 
+        user = "postgres.lyquddfadowlaosrwnwb" 
+        
         password = os.environ.get('DB_PASS') or "Aryav_vij04"
 
         conn = psycopg2.connect(
@@ -20,7 +21,8 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        st.error(f"Region: ap-northeast-1 | User: {user}")
+        # This helps us see if the code is actually using the new string
+        st.error(f"Attempting connection with User: {user}")
         st.error(f"Connection Error: {e}")
         return None
         
