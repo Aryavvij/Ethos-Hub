@@ -19,7 +19,6 @@ def login_user(email, password):
 def signup_user(email, password):
     # add a new user to the cloud
     try:
-        # Use %s for Supabase/PostgreSQL (SQLite uses ?)
         query = "INSERT INTO users (email, password) VALUES (%s, %s)"
         execute_query(query, (email, password))
         return True
@@ -71,16 +70,19 @@ if not st.session_state.logged_in:
             else:
                 st.warning("Please fill in all fields.")
     
-    # stop here so the home page doesn't leak behind the login
+    # CRITICAL: This stops the script ONLY for unauthenticated users
     st.stop() 
 
-# --- 3. ACTUAL HOME PAGE ---
+# --- 3. ACTUAL HOME PAGE (Only reached if logged_in is True) ---
 
-# load styling
-with open("styles.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# Load styling - Note: styling usually applies better outside containers
+try:
+    with open("styles.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+except:
+    pass
 
-# sidebar status and logout
+# Sidebar status and logout
 st.sidebar.success(f"Logged in: {st.session_state.user_email}")
 if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
@@ -89,7 +91,7 @@ if st.sidebar.button("Logout"):
 st.markdown('<div class="home-container">', unsafe_allow_html=True)
 st.title("ETHOS HUB")
 
-# top section for big picture goals
+# Top section for big picture goals
 st.markdown("### Strategic Semester Goals")
 g1, g2, g3 = st.columns(3)
 
@@ -110,7 +112,7 @@ with g3:
 
 st.markdown("---")
 
-# dashboard view of different system modules
+# Dashboard view of different system modules
 st.markdown("### System Status")
 w1, w2, w3 = st.columns(3)
 
@@ -127,6 +129,8 @@ with w1:
 with w2:
     with st.container(border=True):
         st.markdown('<p class="card-title">💰 Budget Snapshot</p>', unsafe_allow_html=True)
+        
+        # DEFINED OUTSIDE: Fixes the NameError in the except block
         current_period = datetime.now().strftime("%B %Y") 
         
         try:
@@ -139,7 +143,6 @@ with w2:
             """
             result = fetch_query(query, (current_period,))
             
-            # Handle the result from fetch_query
             if result and result[0][0] is not None:
                 planned = float(result[0][0])
                 actual = float(result[0][1]) if result[0][1] is not None else 0.0
@@ -155,7 +158,7 @@ with w2:
                 st.markdown(f"<p style='color:gray; font-size:12px;'>Status: No data found for {current_period}</p>", unsafe_allow_html=True)
                 
         except Exception as e:
-            st.error(f"Budget Error: {e}")
+            st.error(f"Budget Error for {current_period}: {e}")
 
 with w3:
     with st.container(border=True):
@@ -169,7 +172,6 @@ st.markdown("---")
 with st.expander("Reset Cloud Data"):
     st.write("This will permanently delete your data from the cloud tables. This cannot be undone.")
     
-    # Confirmation text to prevent accidental clicks
     confirm_text = st.text_input("Type 'DELETE' to enable the reset button")
     
     col_reset1, col_reset2 = st.columns(2)
