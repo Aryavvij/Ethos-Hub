@@ -1,5 +1,11 @@
 import psycopg2
 import streamlit as st
+import os
+
+# This checks Render variables first, then falls back to st.secrets for local testing
+DB_HOST = os.environ.get('DB_HOST') or st.secrets["postgres"]["host"]
+DB_USER = os.environ.get('DB_USER') or st.secrets["postgres"]["user"]
+# ... do the same for password, port, and database name
 
 # this connects us to the supabase cloud
 def get_db_connection():
