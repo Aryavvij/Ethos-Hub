@@ -117,7 +117,6 @@ w1, w2, w3 = st.columns(3)
 with w1:
     with st.container(border=True):
         st.markdown('<p class="card-title">📋 Today\'s Priorities</p>', unsafe_allow_html=True)
-        # pull tasks from the weekly planner session state
         day_idx = (datetime.now().weekday() + 1) % 7 
         if 'weekly_data' in st.session_state and st.session_state.weekly_data[day_idx]:
             for task in st.session_state.weekly_data[day_idx][:3]:
@@ -128,36 +127,35 @@ with w1:
 with w2:
     with st.container(border=True):
         st.markdown('<p class="card-title">💰 Budget Snapshot</p>', unsafe_allow_html=True)
+        current_period = datetime.now().strftime("%B %Y") 
         
         try:
-            conn = sqlite3.connect('ethos.db')
-            current_period = datetime.now().strftime("%B %Y") 
-            
-            # calculate remaining budget from the finance table
             query = """
                 SELECT 
                     SUM(CAST(plan AS REAL)) as total_plan, 
                     SUM(CAST(actual AS REAL)) as total_actual 
                 FROM finances 
-                WHERE period = ?
+                WHERE period = %s
             """
-            df_budget = pd.read_sql_query(query, conn, params=(current_period,))
-            conn.close()
-
-            planned = df_budget['total_plan'].iloc[0] if not df_budget['total_plan'].isnull().all() else 0.0
-            actual = df_budget['total_actual'].iloc[0] if not df_budget['total_actual'].isnull().all() else 0.0
+            result = fetch_query(query, (current_period,))
             
-            remaining = planned - actual
-            color = "#76b372" if remaining >= 0 else "#ff4b4b"
-            
-            st.markdown(f"""
-                <p class='status-text-large' style='margin-top:20px;'>
-                    Remaining: <span style='color:{color}; font-weight:bold;'>Rs {remaining:,.2f}</span>
-                </p>
-            """, unsafe_allow_html=True)
-            
+            # Handle the result from fetch_query
+            if result and result[0][0] is not None:
+                planned = float(result[0][0])
+                actual = float(result[0][1]) if result[0][1] is not None else 0.0
+                remaining = planned - actual
+                color = "#76b372" if remaining >= 0 else "#ff4b4b"
+                
+                st.markdown(f"""
+                    <p class='status-text-large' style='margin-top:20px;'>
+                        Remaining: <span style='color:{color}; font-weight:bold;'>Rs {remaining:,.2f}</span>
+                    </p>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"<p style='color:gray; font-size:12px;'>Status: No data found for {current_period}</p>", unsafe_allow_html=True)
+                
         except Exception as e:
-            st.markdown(f"<p style='color:gray; font-size:12px;'>Status: No data found for {current_period}</p>", unsafe_allow_html=True)
+            st.error(f"Budget Error: {e}")
 
 with w3:
     with st.container(border=True):
