@@ -5,8 +5,7 @@ from database import execute_query, fetch_query
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in.")
     st.stop()
-
-st.title("🗓️ Weekly Planner")
+st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 user = st.session_state.user_email
 start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
 
