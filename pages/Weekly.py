@@ -7,6 +7,11 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page to access this system.")
     st.stop() 
 
+# --- SIDEBAR LOGOUT (Global Fix) ---
+if st.sidebar.button("Logout"):
+    st.session_state.logged_in = False
+    st.rerun()
+
 st.set_page_config(layout="wide", page_title="Weekly Planner")
 
 # Load CSS
@@ -20,17 +25,14 @@ st.title("🗓️ Weekly Planner")
 
 # --- DATE LOGIC ---
 today = datetime.now().date()
-# Automatically find the Monday of the current week to fix alignment
 default_monday = today - timedelta(days=today.weekday())
 
 # --- ALIGNMENT FIX SECTION ---
 with st.container():
     c1, c2 = st.columns([1, 1])
     with c1:
-        # Users pick a date, defaults to current Monday
         start_date = st.date_input("Week Starting On (Monday):", default_monday)
     with c2:
-        # Added padding-top (28px) to align precisely with the input box height
         st.markdown(f"""
             <div style="padding-top: 28px;">
                 <div style="background-color: #1e2129; padding: 10px; border-radius: 5px; border: 1px solid #333; text-align: center;">
@@ -78,10 +80,10 @@ for i, day_name in enumerate(days):
         done_count = 0
         if db_tasks:
             for tid, tname, tdone in db_tasks:
-                task_col, del_col = st.columns([4, 1])
+                # 1. FIX: Tight columns (9:1) so the cross is right next to the text
+                task_col, del_col = st.columns([0.85, 0.15])
                 
                 with task_col:
-                    # Task Checkbox
                     is_checked = st.checkbox(tname, value=bool(tdone), key=f"chk_{tid}")
                     if is_checked != bool(tdone):
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (is_checked, tid))
@@ -90,7 +92,7 @@ for i, day_name in enumerate(days):
                         done_count += 1
                 
                 with del_col:
-                    # Task Deletion
+                    # 2. FIX: Simple transparent button for the cross
                     if st.button("❌", key=f"del_{tid}", help="Delete Task"):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
