@@ -88,24 +88,21 @@ with w1:
 
 # --- Inside Home.py Focus Section ---
 
+# Update the Financial Status block in Home.py
 with w2:
     with st.container(border=True):
         st.markdown('**💰 Financial Status**')
         period = datetime.now().strftime("%B %Y")
         
-        # We calculate total remaining by summing Planned - Actual
+        # Calculate Remaining Budget
         budget_calc = fetch_query("""
-            SELECT SUM(COALESCE(CAST(plan AS REAL), 0) - COALESCE(CAST(actual AS REAL), 0)) 
+            SELECT SUM(COALESCE(plan, 0) - COALESCE(actual, 0)) 
             FROM finances 
             WHERE user_email=%s AND period=%s
         """, (user, period))
         
-        # We calculate Debt
-        debt_calc = fetch_query("""
-            SELECT SUM(COALESCE(CAST(amount AS REAL), 0)) 
-            FROM debt 
-            WHERE user_email=%s
-        """, (user,))
+        # Calculate Debt (9000 Fix)
+        debt_calc = fetch_query("SELECT SUM(COALESCE(amount, 0)) FROM debt WHERE user_email=%s", (user,))
         
         rem = budget_calc[0][0] if budget_calc and budget_calc[0][0] is not None else 0
         debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
