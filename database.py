@@ -2,41 +2,43 @@ import psycopg2
 import streamlit as st
 import os
 
-@st.cache_resource # This is the magic fix for lag
+# 1. REMOVE @st.cache_resource. It keeps "dead" connections alive.
 def get_db_connection():
     try:
-        # Use the DATABASE_URL we set up
         url = os.environ.get('DATABASE_URL')
         if not url:
             return None
-            
-        # The connection now stays "warm" in memory
-        conn = psycopg2.connect(url, connect_timeout=15)
+        # Use a fresh connection every time
+        conn = psycopg2.connect(url, sslmode='require')
         return conn
     except Exception as e:
-        st.error(f"Connection Error: {e}")
         return None
 
 def execute_query(query, params=None):
     conn = get_db_connection()
-    if conn:
-        try:
-            cur = conn.cursor()
+    if not conn:
+        return
+    try:
+        # Using a 'with' block ensures the cursor closes automatically
+        with conn.cursor() as cur:
             cur.execute(query, params)
             conn.commit()
-            cur.close()
-        except Exception as e:
-            st.error(f"Error: {e}")
+    except Exception as e:
+        conn.rollback()  # CRITICAL: This clears the "Aborted Transaction" error
+        st.error(f"Database Error: {e}")
+    finally:
+        conn.close()  # CRITICAL: This prevents "Server closed connection" errors
 
 def fetch_query(query, params=None):
     conn = get_db_connection()
-    if conn:
-        try:
-            cur = conn.cursor()
+    if not conn:
+        return []
+    try:
+        with conn.cursor() as cur:
             cur.execute(query, params)
-            result = cur.fetchall()
-            cur.close()
-            return result
-        except Exception as e:
-            st.error(f"Error: {e}")
-    return []
+            return cur.fetchall()
+    except Exception as e:
+        # No rollback needed for fetch, but we catch errors
+        return []
+    finally:
+        conn.close() # Always close the door when finished
