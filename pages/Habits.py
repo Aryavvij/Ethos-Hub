@@ -4,12 +4,6 @@ import calendar
 from datetime import datetime
 from database import execute_query, fetch_query
 
-import streamlit as st
-import pandas as pd
-import calendar
-from datetime import datetime
-from database import execute_query, fetch_query
-
 # --- SAFETY GATE ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Please log in on the Home page.")
