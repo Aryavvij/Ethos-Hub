@@ -2,6 +2,11 @@ import streamlit as st
 from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 
+# --- AUTH CHECK ---
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.warning("Please log in on the Home page to access this system.")
+    st.stop() 
+
 # --- GLOBAL SIDEBAR ---
 with st.sidebar:
     st.success(f"Logged in: {st.session_state.user_email}")
@@ -10,16 +15,6 @@ with st.sidebar:
         st.session_state.user_email = None
         st.rerun()
     st.markdown("---")
-
-# --- AUTH CHECK ---
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in on the Home page to access this system.")
-    st.stop() 
-
-# --- SIDEBAR LOGOUT (Global Fix) ---
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
 
 st.set_page_config(layout="wide", page_title="Weekly Planner")
 
@@ -36,7 +31,6 @@ st.title("🗓️ Weekly Planner")
 today = datetime.now().date()
 default_monday = today - timedelta(days=today.weekday())
 
-# --- ALIGNMENT FIX SECTION ---
 with st.container():
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -70,7 +64,7 @@ for i, day_name in enumerate(days):
 
         # Task Input
         new_task = st.text_input("Add task", key=f"in_{i}", placeholder="+ Task", label_visibility="collapsed")
-        if st.button("Add", key=f"btn_{i}"):
+        if st.button("Add", key=f"btn_{i}", use_container_width=True):
             if new_task:
                 execute_query(
                     "INSERT INTO weekly_planner (user_email, day_index, task_name, week_start) VALUES (%s, %s, %s, %s)",
@@ -78,9 +72,8 @@ for i, day_name in enumerate(days):
                 )
                 st.rerun()
         
-        st.write("---")
+        st.markdown('<div style="height: 300px; overflow-y: auto;">', unsafe_allow_html=True)
         
-        # Pull tasks from cloud
         db_tasks = fetch_query(
             "SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", 
             (user, i, start_date)
@@ -89,29 +82,28 @@ for i, day_name in enumerate(days):
         done_count = 0
         if db_tasks:
             for tid, tname, tdone in db_tasks:
-                # 1. FIX: Tight columns (9:1) so the cross is right next to the text
-                task_col, del_col = st.columns([0.85, 0.15])
+                # ALIGNMENT FIX: Tight ratio [0.9, 0.1] prevents text boxes from stretching
+                t_col, d_col = st.columns([0.9, 0.1])
                 
-                with task_col:
+                with t_col:
                     is_checked = st.checkbox(tname, value=bool(tdone), key=f"chk_{tid}")
                     if is_checked != bool(tdone):
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (is_checked, tid))
                         st.rerun()
-                    if is_checked: 
-                        done_count += 1
+                    if is_checked: done_count += 1
                 
-                with del_col:
-                    # 2. FIX: Simple transparent button for the cross
-                    if st.button("❌", key=f"del_{tid}", help="Delete Task"):
+                with d_col:
+                    # Small delete button
+                    if st.button("×", key=f"del_{tid}", help="Delete"):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
-        
+        st.markdown('</div>', unsafe_allow_html=True)
+
         # Summary Stats
         total_tasks = len(db_tasks)
         not_done = total_tasks - done_count
         st.markdown(f"""
             <div style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
-                <p style="color: #76b372; margin: 0; font-size: 14px;">Done: {done_count}</p>
-                <p style="color: #ff4b4b; margin: 0; font-size: 14px;">Pending: {not_done}</p>
+                <p style="color: #76b372; margin: 0; font-size: 13px;">✅ {done_count} | ⭕ {not_done}</p>
             </div>
         """, unsafe_allow_html=True)
