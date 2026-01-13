@@ -11,6 +11,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 user = st.session_state.user_email
 st.set_page_config(layout="wide", page_title="Monthly Habit Tracker")
+st.title("Monthly Habit Tracker")
 
 # 1. SELECTORS
 c1, c2 = st.columns(2)
