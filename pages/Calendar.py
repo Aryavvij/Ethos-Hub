@@ -7,13 +7,19 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in.")
     st.stop()
 
-st.title("🗓️ Calendar")
+st.title("🗓️ Monthly Events")
 user = st.session_state.user_email
-month_num = datetime.now().month
-year = 2026
+month_num = st.selectbox("Month", range(1, 13), index=datetime.now().month-1)
+year = st.selectbox("Year", [2025, 2026], index=1)
+
+with st.expander("➕ Add Event"):
+    e_date = st.date_input("Date")
+    e_desc = st.text_input("Name")
+    if st.button("Save"):
+        execute_query("INSERT INTO events (user_email, event_date, description) VALUES (%s, %s, %s)", (user, e_date, e_desc))
+        st.rerun()
 
 cal_matrix = calendar.monthcalendar(year, month_num)
-cols = st.columns(7)
 for week in cal_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
@@ -21,7 +27,7 @@ for week in cal_matrix:
             with cols[i]:
                 with st.container(border=True):
                     st.write(f"**{day}**")
-                    # SYMMETRY FIX: Scrollable div with fixed height
+                    # Symmetry Fix: Fixed 80px scroll area
                     st.markdown('<div style="height:80px; overflow-y:auto; overflow-x:hidden;">', unsafe_allow_html=True)
                     events = fetch_query("SELECT id, description FROM events WHERE user_email=%s AND event_date=%s", (user, f"{year}-{month_num:02d}-{day:02d}"))
                     for eid, desc in events:
