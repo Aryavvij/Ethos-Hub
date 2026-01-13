@@ -4,6 +4,14 @@ import hashlib
 from datetime import datetime, timedelta  
 from database import get_db_connection, execute_query, fetch_query
 
+# Initialize session state keys at the very start
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'user_email' not in st.session_state:
+    st.session_state.user_email = None
+
+# ... rest of your Home.py code ...
+
 # --- 1. AUTHENTICATION UTILITIES ---
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
