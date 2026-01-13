@@ -70,6 +70,7 @@ except:
 st.sidebar.success(f"User: {st.session_state.user_email}")
 if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
+    st.session_state.user_email = None 
     st.rerun()
 
 st.title("ETHOS HUB")
