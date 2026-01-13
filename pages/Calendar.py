@@ -3,11 +3,12 @@ import calendar
 from datetime import datetime
 from database import execute_query, fetch_query
 
+st.set_page_config(layout="wide", page_title="🗓️ Monthly Events")
+
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in.")
     st.stop()
 
-st.title("🗓️ Monthly Events")
 user = st.session_state.user_email
 month_num = st.selectbox("Month", range(1, 13), index=datetime.now().month-1)
 year = st.selectbox("Year", [2025, 2026], index=1)
