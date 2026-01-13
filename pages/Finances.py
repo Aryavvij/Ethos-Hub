@@ -3,6 +3,15 @@ import pandas as pd
 import plotly.express as px
 from database import fetch_query, execute_query
 
+# --- GLOBAL SIDEBAR ---
+with st.sidebar:
+    st.success(f"Logged in: {st.session_state.user_email}")
+    if st.button("Logout", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user_email = None
+        st.rerun()
+    st.markdown("---")
+
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page to access this system.")
     st.stop() 
