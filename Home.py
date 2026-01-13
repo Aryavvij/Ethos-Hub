@@ -136,24 +136,31 @@ with w2:
     with st.container(border=True):
         st.markdown('<p class="card-title">💰 Financial Status</p>', unsafe_allow_html=True)
         
-        # 1. Calculate Remaining Budget
+        # Get current month/year for filtering
+        now = datetime.now()
+        curr_month = now.month
+        curr_year = now.year
+
+        # 1. Calculate Remaining Budget for CURRENT MONTH ONLY
+        # This ensures Jan data doesn't mix with Dec or Feb
         budget_query = """
             SELECT SUM(CAST(plan AS REAL) - CAST(actual AS REAL)) 
             FROM finances 
-            WHERE user_email = %s
+            WHERE user_email = %s 
+            AND period = %s
         """
-        budget_res = fetch_query(budget_query, (user,))
+        current_period = now.strftime("%B %Y") # e.g., "January 2026"
+        budget_res = fetch_query(budget_query, (user, current_period))
         rem_money = budget_res[0][0] if budget_res and budget_res[0][0] is not None else 0
         
-        # 2. Calculate Total Debt
+        # 2. Calculate Total Debt (Usually all-time, but can be filtered if needed)
         debt_query = "SELECT SUM(amount) FROM debt WHERE user_email = %s"
         debt_res = fetch_query(debt_query, (user,))
         total_debt = debt_res[0][0] if debt_res and debt_res[0][0] is not None else 0
         
-        # 3. Display with formatting
         st.markdown(f"""
             <div style="margin-top:10px;">
-                <p style="margin:0; font-size:14px; color:gray;">Remaining Budget:</p>
+                <p style="margin:0; font-size:14px; color:gray;">{current_period} Budget:</p>
                 <p style="margin:0; font-size:20px; color:#76b372; font-weight:bold;">Rs {rem_money:,.2f}</p>
                 <hr style="margin:10px 0; border-color:#333;">
                 <p style="margin:0; font-size:14px; color:gray;">Total Debt Owed:</p>
