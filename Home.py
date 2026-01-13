@@ -33,13 +33,16 @@ if not st.session_state.logged_in:
         email = st.text_input("Email")
         password = st.text_input("Password", type='password')
         if st.button("Login"):
-            result = login_user(email, make_hashes(password))
-            if result:
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                st.rerun() 
-            else:
-                st.error("Incorrect Email or Password")
+            try:
+                result = login_user(email, make_hashes(password))
+                if result:
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = email
+                    st.rerun()
+                else:
+                    st.error("Incorrect Email or Password")
+            except Exception as e:
+                st.error("Connection lost. Please wait 5 seconds and try again.")
     
     with tab2:
         st.subheader("Create New Account")
