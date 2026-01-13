@@ -2,6 +2,15 @@ import streamlit as st
 from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 
+# --- GLOBAL SIDEBAR ---
+with st.sidebar:
+    st.success(f"Logged in: {st.session_state.user_email}")
+    if st.button("Logout", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user_email = None
+        st.rerun()
+    st.markdown("---")
+
 # --- AUTH CHECK ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page to access this system.")
