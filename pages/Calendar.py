@@ -3,101 +3,68 @@ import calendar
 from datetime import datetime
 from database import execute_query, fetch_query
 
-# --- GLOBAL SIDEBAR ---
-with st.sidebar:
-    st.success(f"Logged in: {st.session_state.user_email}")
-    if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_email = None
-        st.rerun()
-    st.markdown("---")
-
+# --- AUTH CHECK ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in to access the calendar.")
+    st.warning("Please log in on the Home page.")
     st.stop()
 
-st.set_page_config(layout="wide", page_title="Monthly Calendar")
+# --- ISSUE #5: SIDEBAR LOGOUT ---
+with st.sidebar:
+    st.success(f"User: {st.session_state.user_email}")
+    if st.button("Logout", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
 
-# Load CSS
-try:
-    with open("styles.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-except:
-    pass
-
-st.title("🗓️ Monthly Events & Birthdays")
+st.title("🗓️ Monthly Events")
 
 # Date Selectors
 today = datetime.now()
-col_m, col_y = st.columns([2, 1])
-with col_m:
-    month_name = st.selectbox("Select Month", list(calendar.month_name)[1:], index=today.month-1)
-with col_y:
+c1, c2 = st.columns([2, 1])
+with c1:
+    month_name = st.selectbox("Month", list(calendar.month_name)[1:], index=today.month-1)
+with c2:
     year = st.number_input("Year", min_value=2025, max_value=2030, value=today.year)
 
 month_num = list(calendar.month_name).index(month_name)
 
-# --- Add Event Section ---
+# --- ADD EVENT ---
 with st.expander("➕ Add New Event"):
-    e_col1, e_col2 = st.columns(2)
-    with e_col1:
-        event_date = st.date_input("Date", datetime(year, month_num, 1))
-    with e_col2:
-        event_desc = st.text_input("What's happening?")
-    
+    e_date = st.date_input("Date", datetime(year, month_num, 1))
+    e_desc = st.text_input("Event Name")
     if st.button("Save Event"):
-        if event_desc:
-            execute_query("INSERT INTO events (user_email, event_date, description) VALUES (%s, %s, %s)",
-                          (st.session_state.user_email, event_date, event_desc))
-            st.success("Event added!")
-            st.rerun()
+        execute_query("INSERT INTO events (user_email, event_date, description) VALUES (%s, %s, %s)",
+                      (st.session_state.user_email, e_date, e_desc))
+        st.rerun()
 
-st.write("---")
-
-# --- CALENDAR GRID ---
-days_of_week = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-header_cols = st.columns(7)
-for idx, day_head in enumerate(days_of_week):
-    header_cols[idx].markdown(f"<p style='text-align:center; font-weight:bold; color:#76b372; margin-bottom:5px;'>{day_head}</p>", unsafe_allow_html=True)
-
+# --- ISSUE #7: SYMMETRICAL CALENDAR GRID ---
 cal_matrix = calendar.monthcalendar(year, month_num)
+days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+cols = st.columns(7)
+for i, d in enumerate(days):
+    cols[i].markdown(f"<p style='text-align:center; color:#76b372;'><b>{d}</b></p>", unsafe_allow_html=True)
 
 for week in cal_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
         if day == 0:
-            # Empty filler to keep row spacing consistent
-            cols[i].markdown("<div style='height:120px;'></div>", unsafe_allow_html=True)
+            cols[i].write("")
         else:
             with cols[i]:
-                # FORCED FIXED HEIGHT CONTAINER
+                # Fixed height container to maintain symmetry
                 with st.container(border=True):
-                    # Fixed height wrapper for the entire day box
-                    st.markdown(f"""
-                        <div style="height: 100px; overflow-y: auto; overflow-x: hidden;">
-                            <p style="margin:0; font-weight:bold; font-size:14px; color:gray;">{day}</p>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"<p style='margin:0; font-size:12px;'>{day}</p>", unsafe_allow_html=True)
                     
-                    current_date = f"{year}-{month_num:02d}-{day:02d}"
+                    # Fetch Events
+                    cur_date = f"{year}-{month_num:02d}-{day:02d}"
                     events = fetch_query("SELECT id, description FROM events WHERE user_email=%s AND event_date=%s", 
-                                        (st.session_state.user_email, current_date))
+                                        (st.session_state.user_email, cur_date))
                     
-                    if events:
-                        for eid, desc in events:
-                            # Use a mini column layout inside for the event and cross
-                            ev_c, del_c = st.columns([5, 1.5])
-                            with ev_c:
-                                st.markdown(f"""
-                                    <div style="background-color:#76b372; color:white; font-size:10px; 
-                                    border-radius:3px; padding:2px 5px; margin-top:2px; white-space: nowrap; 
-                                    overflow: hidden; text-overflow: ellipsis;" title="{desc}">
-                                        📍 {desc}
-                                    </div>
-                                """, unsafe_allow_html=True)
-                            with del_c:
-                                # Clean styled delete button
-                                if st.button("×", key=f"dev_{eid}", help=f"Delete {desc}"):
-                                    execute_query("DELETE FROM events WHERE id=%s", (eid,))
-                                    st.rerun()
-                    
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    # Scrollable event area to prevent box expansion
+                    st.markdown('<div style="height:60px; overflow-y:auto; font-size:10px;">', unsafe_allow_html=True)
+                    for eid, desc in events:
+                        ev_c, del_c = st.columns([4, 1])
+                        ev_c.markdown(f"<div style='background:#76b372; color:white; border-radius:3px; padding:2px;'>{desc}</div>", unsafe_allow_html=True)
+                        if del_c.button("×", key=f"d_{eid}"):
+                            execute_query("DELETE FROM events WHERE id=%s", (eid,))
+                            st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
