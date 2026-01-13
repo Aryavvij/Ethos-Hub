@@ -46,16 +46,17 @@ for i, day_name in enumerate(days):
         
         st.write("---")
         
-        # ALIGNMENT FIX: This negative margin div pulls the first task up to the line
-        st.markdown('<div style="margin-top: -25px;"></div>', unsafe_allow_html=True)
+        # ALIGNMENT FIX: Pull the task list up closer to the divider
+        st.markdown('<div style="margin-top: -30px;">', unsafe_allow_html=True)
         
-        # Task List Area
-        st.markdown('<div style="height:400px; overflow-y:auto;">', unsafe_allow_html=True)
+        # Pull tasks from database
         tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, i, start_date))
         
+        # Task List Area with fixed height for symmetry
+        # We put the loop INSIDE the div to keep everything aligned
         for tid, tname, tdone in tasks:
-            # 9:1 Ratio for tight alignment
-            t_col, d_col = st.columns([0.85, 0.15])
+            # Column ratio for tight alignment of checkbox and delete button
+            t_col, d_col = st.columns([0.8, 0.2])
             
             with t_col:
                 # Checkbox for task
@@ -65,9 +66,10 @@ for i, day_name in enumerate(days):
                     st.rerun()
             
             with d_col:
-                # Small 'x' to delete
-                st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True) # Aligns 'x' with checkbox text
-                if st.button("×", key=f"del_{tid}"):
+                # Small 'x' to delete, positioned to align with checkbox
+                st.markdown('<p style="margin-top: 28px;"></p>', unsafe_allow_html=True) # Vertical spacer for button alignment
+                if st.button("×", key=f"del_{tid}", help="Delete Task"):
                     execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                     st.rerun()
+        
         st.markdown('</div>', unsafe_allow_html=True)
