@@ -87,32 +87,36 @@ with w1:
             st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
 
 # --- Inside Home.py Focus Section ---
+
 with w2:
     with st.container(border=True):
         st.markdown('**💰 Financial Status**')
-        period = datetime.now().strftime("%B %Y") # January 2026
+        period = datetime.now().strftime("%B %Y")
         
-        # 1. REMAINING BUDGET CALCULATION
-        # Logic: (Total Planned) - (Total Actual) for the month
-        budget_res = fetch_query("""
-            SELECT SUM(CAST(plan AS REAL)) - SUM(CAST(actual AS REAL)) 
+        # We calculate total remaining by summing Planned - Actual
+        budget_calc = fetch_query("""
+            SELECT SUM(COALESCE(CAST(plan AS REAL), 0) - COALESCE(CAST(actual AS REAL), 0)) 
             FROM finances 
             WHERE user_email=%s AND period=%s
         """, (user, period))
         
-        # 2. TOTAL DEBT CALCULATION
-        debt_res = fetch_query("SELECT SUM(CAST(amount AS REAL)) FROM debt WHERE user_email=%s", (user,))
+        # We calculate Debt
+        debt_calc = fetch_query("""
+            SELECT SUM(COALESCE(CAST(amount AS REAL), 0)) 
+            FROM debt 
+            WHERE user_email=%s
+        """, (user,))
         
-        rem_val = budget_res[0][0] if budget_res and budget_res[0][0] is not None else 0
-        debt_val = debt_res[0][0] if debt_res and debt_res[0][0] is not None else 0
+        rem = budget_calc[0][0] if budget_calc and budget_calc[0][0] is not None else 0
+        debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
         
         st.markdown(f"""
             <div style="margin-top:10px;">
                 <p style="margin:0; font-size:14px; color:gray;">Remaining ({period}):</p>
-                <p style="margin:0; font-size:22px; color:#76b372; font-weight:bold;">Rs {rem_val:,.2f}</p>
+                <p style="margin:0; font-size:22px; color:#76b372; font-weight:bold;">Rs {rem:,.2f}</p>
                 <hr style="margin:10px 0; border-color:#333;">
                 <p style="margin:0; font-size:14px; color:gray;">Total Debt Owed:</p>
-                <p style="margin:0; font-size:22px; color:#ff4b4b; font-weight:bold;">Rs {debt_val:,.2f}</p>
+                <p style="margin:0; font-size:22px; color:#ff4b4b; font-weight:bold;">Rs {debt:,.2f}</p>
             </div>
         """, unsafe_allow_html=True)
 
