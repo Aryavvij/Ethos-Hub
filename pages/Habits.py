@@ -24,7 +24,7 @@ days_list = [str(i) for i in range(1, num_days + 1)]
 
 # 2. LOAD DATA
 db_habits = fetch_query("SELECT DISTINCT habit_name FROM habit_logs WHERE user_email=%s", (user,))
-all_habits = list(set(["Gym 💪", "Reading 📖", "Wake up 05:00 ⏰"] + [row[0] for row in db_habits]))
+all_habits = list(set(["Brushing Morning",] + [row[0] for row in db_habits]))
 habit_df = pd.DataFrame(False, index=all_habits, columns=days_list)
 
 db_data = fetch_query("SELECT habit_name, EXTRACT(DAY FROM log_date)::int, status FROM habit_logs WHERE user_email=%s AND EXTRACT(MONTH FROM log_date)=%s AND EXTRACT(YEAR FROM log_date)=%s", (user, month_num, year))
