@@ -35,7 +35,7 @@ days_list = [str(i) for i in range(1, num_days + 1)]
 db_habits = fetch_query("SELECT DISTINCT habit_name FROM habits WHERE user_email=%s", (user,))
 persisted_habits = [row[0] for row in db_habits]
 
-# Combine defaults with your custom ones (set() removes duplicates)
+# Combine defaults with your custom ones
 default_habits = ["Gym 💪", "Reading 📖", "Wake up 05:00 ⏰"]
 all_habits = list(set(default_habits + persisted_habits))
 
@@ -53,29 +53,39 @@ for h_name, d_num, stat in db_data:
     if h_name in habit_df.index and str(d_num) in habit_df.columns:
         habit_df.at[h_name, str(d_num)] = bool(stat)
 
-# 4. THE DATA EDITOR
-st.info("💡 Add new habits in the bottom row. Scroll right to see the full month.")
+# 4. THE DATA EDITOR (Updated with Checkbox Fix)
+st.info("💡 Add new habits in the bottom row. Boxes will appear for the whole month instantly!")
+
+# This specific configuration fixes the "Red Triangle" issue by forcing 
+# new rows to use Checkbox columns instead of text
+day_config = {
+    d: st.column_config.CheckboxColumn(label=d, default=False) 
+    for d in days_list
+}
+
 edited_df = st.data_editor(
     habit_df, 
     num_rows="dynamic", 
     use_container_width=True,
-    # This forces every cell to be a checkbox immediately
-    column_config={d: st.column_config.CheckboxColumn(required=True) for d in days_list}
+    column_config=day_config
 )
 
 # 5. SYNC TO CLOUD
 if st.button("☁️ Sync to Supabase"):
-    for h_name in edited_df.index:
-        for d_str in edited_df.columns:
-            status = edited_df.loc[h_name, d_str]
-            formatted_date = f"{year}-{month_num:02d}-{int(d_str):02d}"
-            
-            execute_query("""
-                INSERT INTO habits (user_email, habit_name, log_date, status) 
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user_email, habit_name, log_date) 
-                DO UPDATE SET status = EXCLUDED.status
-            """, (user, h_name, formatted_date, bool(status)))
+    with st.spinner("Syncing with cloud..."):
+        for h_name in edited_df.index:
+            for d_str in edited_df.columns:
+                status = edited_df.loc[h_name, d_str]
+                # Format date correctly for PostgreSQL (YYYY-MM-DD)
+                formatted_date = f"{year}-{month_num:02d}-{int(d_str):02d}"
+                
+                # UPSERT logic requires the SQL Unique Constraint to be active
+                execute_query("""
+                    INSERT INTO habits (user_email, habit_name, log_date, status) 
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_email, habit_name, log_date) 
+                    DO UPDATE SET status = EXCLUDED.status
+                """, (user, h_name, formatted_date, bool(status)))
     st.success("Sync complete!")
     st.rerun()
 
@@ -83,9 +93,10 @@ if st.button("☁️ Sync to Supabase"):
 st.markdown("---")
 st.subheader("Monthly Consistency Score")
 if not edited_df.empty:
-    # This creates a column for every habit dynamically
+    # m_cols handles up to 4 metrics per row
     m_cols = st.columns(4) 
     for i, habit in enumerate(edited_df.index):
+        # Calculate success rate based on number of ticks
         completed = edited_df.loc[habit].sum()
         score = (completed / num_days) * 100
         with m_cols[i % 4]:
