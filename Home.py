@@ -10,24 +10,37 @@ def make_hashes(password):
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
+# --- AUTHENTICATION UI ---
 if not st.session_state.logged_in:
     st.title("Ethos System Login")
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
+    
     with tab1:
         email = st.text_input("Email")
         password = st.text_input("Password", type='password')
         if st.button("Login"):
-            res = fetch_query("SELECT * FROM users WHERE email=%s AND password=%s", (email, make_hashes(password)))
-            if res:
+            res = fetch_query("SELECT password FROM users WHERE email=%s", (email,))
+            if res and res[0][0] == make_hashes(password):
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
-                st.rerun()
+                st.rerun() 
             else:
-                st.error("Invalid credentials")
-    # ... (Sign up tab code here) ...
-    st.stop()
+                st.error("Incorrect Email or Password")
+    
+    with tab2:
+        st.subheader("Create New Account")
+        new_email = st.text_input("New Email", key="signup_email")
+        new_pass = st.text_input("New Password", type='password', key="signup_pass")
+        if st.button("Sign Up"):
+            hashed_pass = make_hashes(new_pass)
+            try:
+                execute_query("INSERT INTO users (email, password) VALUES (%s, %s)", (new_email, hashed_pass))
+                st.success("Account created! Go to Login tab.")
+            except:
+                st.error("Email already exists.")
+    st.stop() 
 
-# --- THE FULL DASHBOARD ---
+# --- HOME DASHBOARD ---
 user = st.session_state.user_email
 st.sidebar.success(f"User: {user}")
 if st.sidebar.button("Logout"):
@@ -36,7 +49,7 @@ if st.sidebar.button("Logout"):
 
 st.title("ETHOS HUB")
 
-# SEMESTER GOALS CARDS
+# 1. STRATEGIC SEMESTER GOALS
 st.markdown("### 🎯 Strategic Semester Goals")
 res = fetch_query("SELECT academic, health, personal FROM semester_goals WHERE user_email=%s", (user,))
 g_acad, g_health, g_pers = res[0] if res else ("", "", "")
@@ -44,39 +57,61 @@ g_acad, g_health, g_pers = res[0] if res else ("", "", "")
 g1, g2, g3 = st.columns(3)
 with g1:
     with st.container(border=True):
-        st.markdown('<p style="font-weight:bold; color:#76b372;">Academic</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#76b372; font-weight:bold;">Academic</p>', unsafe_allow_html=True)
         new_acad = st.text_area("A", value=g_acad, height=100, label_visibility="collapsed", key="ac")
 with g2:
     with st.container(border=True):
-        st.markdown('<p style="font-weight:bold; color:#76b372;">Health</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#76b372; font-weight:bold;">Health</p>', unsafe_allow_html=True)
         new_health = st.text_area("H", value=g_health, height=100, label_visibility="collapsed", key="he")
 with g3:
     with st.container(border=True):
-        st.markdown('<p style="font-weight:bold; color:#76b372;">Others</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#76b372; font-weight:bold;">Others</p>', unsafe_allow_html=True)
         new_pers = st.text_area("O", value=g_pers, height=100, label_visibility="collapsed", key="ot")
 
 if st.button("Update Goals"):
     execute_query("INSERT INTO semester_goals (user_email, academic, health, personal) VALUES (%s,%s,%s,%s) ON CONFLICT (user_email) DO UPDATE SET academic=EXCLUDED.academic, health=EXCLUDED.health, personal=EXCLUDED.personal", (user, new_acad, new_health, new_pers))
-    st.success("Goals Saved")
+    st.success("Goals updated!")
 
 st.markdown("---")
 
-# TODAY'S FOCUS SECTION
+# 2. TODAY'S FOCUS SECTION
 st.markdown("### Today's Focus")
 w1, w2, w3 = st.columns(3)
 
 with w1:
     with st.container(border=True):
-        st.markdown("**📋 Today's Priorities**")
-        # Pulling from Weekly and Events...
-        # (Insert your full Priorities logic here)
+        st.markdown('**📋 Today\'s Priorities**')
+        t_date = datetime.now().date()
+        tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, t_date.weekday(), t_date - timedelta(days=t_date.weekday())))
+        for tname, tdone in tasks:
+            st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
 
 with w2:
     with st.container(border=True):
-        st.markdown("**💰 Financial Status**")
-        # (Insert your Budget/Debt snapshot logic here)
+        st.markdown('**💰 Financial Status**')
+        period = datetime.now().strftime("%B %Y")
+        
+        # Budget Calc
+        budget = fetch_query("SELECT SUM(CAST(plan AS REAL) - CAST(actual AS REAL)) FROM finances WHERE user_email=%s AND period=%s", (user, period))
+        rem = budget[0][0] or 0
+        
+        # DEBT CALC: Cast to REAL ensures it doesn't return 0 for text strings
+        debt_res = fetch_query("SELECT SUM(CAST(amount AS REAL)) FROM debt WHERE user_email=%s", (user,))
+        total_debt = debt_res[0][0] if debt_res and debt_res[0][0] is not None else 0
+        
+        st.markdown(f"""
+            <div style="margin-top:10px;">
+                <p style="margin:0; font-size:14px; color:gray;">{period} Budget:</p>
+                <p style="margin:0; font-size:18px; color:#76b372; font-weight:bold;">Rs {rem:,.2f}</p>
+                <hr style="margin:10px 0; border-color:#333;">
+                <p style="margin:0; font-size:14px; color:gray;">Total Debt Owed:</p>
+                <p style="margin:0; font-size:18px; color:#ff4b4b; font-weight:bold;">Rs {total_debt:,.2f}</p>
+            </div>
+        """, unsafe_allow_html=True)
 
 with w3:
     with st.container(border=True):
-        st.markdown("**🎓 Today's Classes**")
-        # (Insert your Timetable logic here)
+        st.markdown('**🎓 Today\'s Classes**')
+        classes = fetch_query("SELECT start_time, subject FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, datetime.now().strftime("%A")))
+        for ctime, csub in classes:
+            st.markdown(f"**{ctime.strftime('%H:%M')}** - {csub}")
