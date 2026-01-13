@@ -5,36 +5,28 @@ from datetime import datetime, timedelta
 from database import get_db_connection, execute_query, fetch_query
 
 # --- 1. AUTHENTICATION UTILITIES ---
-
-# hashing for security
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def login_user(email, password):
-    # check the cloud database for this user
     query = "SELECT * FROM users WHERE email = %s AND password = %s"
     result = fetch_query(query, (email, password))
     return result[0] if result else None
 
 def signup_user(email, password):
-    # add a new user to the cloud
     try:
         query = "INSERT INTO users (email, password) VALUES (%s, %s)"
         execute_query(query, (email, password))
         return True
     except Exception as e:
-        st.error(f"Sign up error: {e}")
         return False
 
 # --- 2. AUTHENTICATION UI ---
-
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# show login screen if not authenticated
 if not st.session_state.logged_in:
     st.title("Ethos System Login")
-    
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
     
     with tab1:
@@ -61,133 +53,102 @@ if not st.session_state.logged_in:
             elif len(new_pass) < 6:
                 st.error("Password must be at least 6 characters.")
             elif new_email and new_pass:
-                hashed_new_pswd = make_hashes(new_pass)
-                if signup_user(new_email, hashed_new_pswd):
-                    st.success("Account created successfully!")
-                    st.info("You can now go to the Login tab to enter your system.")
+                if signup_user(new_email, make_hashes(new_pass)):
+                    st.success("Account created! Go to Login tab.")
                 else:
-                    st.error("This email is already registered.")
-            else:
-                st.warning("Please fill in all fields.")
-    
-    # CRITICAL: This stops the script ONLY for unauthenticated users
+                    st.error("Email already registered.")
     st.stop() 
 
-# --- 3. ACTUAL HOME PAGE (Only reached if logged_in is True) ---
-
-# Load styling - Note: styling usually applies better outside containers
+# --- 3. ACTUAL HOME PAGE ---
 try:
     with open("styles.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 except:
     pass
 
-# Sidebar status and logout
-st.sidebar.success(f"Logged in: {st.session_state.user_email}")
+# Sidebar logout
+st.sidebar.success(f"User: {st.session_state.user_email}")
 if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
     st.rerun()
 
-st.markdown('<div class="home-container">', unsafe_allow_html=True)
 st.title("ETHOS HUB")
+user = st.session_state.user_email
 
-# Top section for big picture goals
-st.markdown("### Strategic Semester Goals")
+# --- STRATEGIC SEMESTER GOALS (Persistent Fix) ---
+st.markdown("### 🎯 Strategic Semester Goals")
+existing_goals = fetch_query("SELECT academic, health, personal FROM semester_goals WHERE user_email=%s", (user,))
+g_acad, g_health, g_pers = existing_goals[0] if existing_goals else ("", "", "")
+
 g1, g2, g3 = st.columns(3)
-
 with g1:
     with st.container(border=True):
         st.markdown('<p class="card-title">Academic</p>', unsafe_allow_html=True)
-        st.text_area("A", value="• Target GPA: 4.0", height=150, label_visibility="collapsed", key="ac_goals")
-
+        new_acad = st.text_area("A", value=g_acad, height=100, label_visibility="collapsed", key="ac_goals")
 with g2:
     with st.container(border=True):
         st.markdown('<p class="card-title">Health</p>', unsafe_allow_html=True)
-        st.text_area("H", value="• Gym 4x Weekly", height=150, label_visibility="collapsed", key="he_goals")
-
+        new_health = st.text_area("H", value=g_health, height=100, label_visibility="collapsed", key="he_goals")
 with g3:
     with st.container(border=True):
         st.markdown('<p class="card-title">Others</p>', unsafe_allow_html=True)
-        st.text_area("O", value="• Learn Python", height=150, label_visibility="collapsed", key="ot_goals")
+        new_pers = st.text_area("O", value=g_pers, height=100, label_visibility="collapsed", key="ot_goals")
+
+if st.button("Update Goals"):
+    execute_query("""
+        INSERT INTO semester_goals (user_email, academic, health, personal)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (user_email) DO UPDATE SET 
+        academic=EXCLUDED.academic, health=EXCLUDED.health, personal=EXCLUDED.personal
+    """, (user, new_acad, new_health, new_pers))
+    st.success("Goals updated!")
 
 st.markdown("---")
 
-# --- 3. UPDATED SYSTEM STATUS SECTION ---
+# --- TODAY'S FOCUS SECTION ---
 st.markdown("### Today's Focus")
 w1, w2, w3 = st.columns(3)
 
-# 1. Priorities (Weekly Tasks + Calendar Events)
+# 1. Priorities (Tasks + Calendar)
 with w1:
     with st.container(border=True):
         st.markdown('<p class="card-title">📋 Today\'s Priorities</p>', unsafe_allow_html=True)
+        t_date = datetime.now().date()
+        day_idx = t_date.weekday()
+        current_monday = t_date - timedelta(days=day_idx)
         
-        # Determine the current day index (Monday=0)
-        today_date = datetime.now().date()
-        day_idx = today_date.weekday()
-        current_monday = today_date - timedelta(days=day_idx)
-        
-        # Pull Tasks from Weekly Planner
-        tasks = fetch_query(
-            "SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s",
-            (st.session_state.user_email, day_idx, current_monday)
-        )
-        
-        # Pull Events from Calendar
-        events = fetch_query(
-            "SELECT description FROM events WHERE user_email=%s AND event_date=%s",
-            (st.session_state.user_email, today_date)
-        )
+        tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, day_idx, current_monday))
+        events = fetch_query("SELECT description FROM events WHERE user_email=%s AND event_date=%s", (user, t_date))
         
         if not tasks and not events:
-            st.markdown("<p style='color:gray; font-size:14px;'>Nothing scheduled for today.</p>", unsafe_allow_html=True)
+            st.caption("Nothing scheduled.")
         else:
-            # Display Calendar Events first (as alerts)
-            for ev in events:
-                st.markdown(f"**📍 EVENT: {ev[0]}**")
-            
-            # Display Weekly Tasks
+            for ev in events: st.markdown(f"**📍 {ev[0]}**")
             for tname, tdone in tasks:
-                status = "✅" if tdone else "⭕"
-                st.markdown(f"<p style='font-size:14px;'>{status} {tname}</p>", unsafe_allow_html=True)
+                st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
 
-# 2. Budget Snapshot (Keep existing logic)
+# 2. Budget & Debt (Combined Fix)
 with w2:
     with st.container(border=True):
-        st.markdown('<p class="card-title">💰 Budget Snapshot</p>', unsafe_allow_html=True)
-        current_period = datetime.now().strftime("%B %Y")
-        try:
-            query = "SELECT SUM(CAST(plan AS REAL)), SUM(CAST(actual AS REAL)) FROM finances WHERE period = %s"
-            result = fetch_query(query, (current_period,))
-            if result and result[0][0] is not None:
-                remaining = float(result[0][0]) - (float(result[0][1]) if result[0][1] else 0)
-                color = "#76b372" if remaining >= 0 else "#ff4b4b"
-                st.markdown(f"<p class='status-text-large' style='margin-top:20px;'>Remaining: <span style='color:{color}; font-weight:bold;'>Rs {remaining:,.2f}</span></p>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<p style='color:gray; font-size:12px;'>No data for {current_period}</p>", unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Error: {e}")
+        st.markdown('<p class="card-title">💰 Budget & Debt</p>', unsafe_allow_html=True)
+        budget_res = fetch_query("SELECT SUM(CAST(plan AS REAL) - CAST(actual AS REAL)) FROM finances WHERE user_email=%s", (user,))
+        debt_res = fetch_query("SELECT SUM(amount) FROM debt WHERE user_email=%s", (user,))
+        
+        rem_money = budget_res[0][0] if budget_res and budget_res[0][0] else 0
+        rem_debt = debt_res[0][0] if debt_res and debt_res[0][0] else 0
+        
+        st.markdown(f"**Remaining:** <span style='color:#76b372;'>Rs {rem_money:,.2f}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Total Debt:** <span style='color:#ff4b4b;'>Rs {rem_debt:,.2f}</span>", unsafe_allow_html=True)
 
-# 3. Today's Classes (Replacing Inspiration)
+# 3. Today's Classes
 with w3:
     with st.container(border=True):
         st.markdown('<p class="card-title">🎓 Today\'s Classes</p>', unsafe_allow_html=True)
         day_name = datetime.now().strftime("%A")
-        
-        # Fetch classes for the current day
-        classes = fetch_query(
-            "SELECT start_time, subject, location FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC",
-            (st.session_state.user_email, day_name)
-        )
+        classes = fetch_query("SELECT start_time, subject, location FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, day_name))
         
         if classes:
             for ctime, csub, cloc in classes:
-                # Format time to HH:MM
-                time_str = ctime.strftime("%H:%M")
-                st.markdown(f"""
-                    <div style="border-left: 3px solid #76b372; padding-left: 10px; margin-bottom: 8px;">
-                        <p style="margin:0; font-weight:bold; font-size:14px;">{time_str} - {csub}</p>
-                        <p style="margin:0; font-size:12px; color:gray;">📍 {cloc if cloc else 'No Location'}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"**{ctime.strftime('%H:%M')}** - {csub} (📍{cloc})")
         else:
-            st.markdown("<p style='color:gray; font-size:14px;'>No classes today. Rest up!</p>", unsafe_allow_html=True)
+            st.caption("No classes today.")
