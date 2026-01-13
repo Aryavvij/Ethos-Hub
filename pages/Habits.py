@@ -4,20 +4,43 @@ import calendar
 from datetime import datetime
 from database import execute_query, fetch_query
 
-# --- AUTH & SIDEBAR ---
+import streamlit as st
+import pandas as pd
+import calendar
+from datetime import datetime
+from database import execute_query, fetch_query
+
+# --- SAFETY GATE ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in on the Home page.")
-    st.stop() 
+    st.warning("⚠️ Please log in on the Home page.")
+    if st.button("Go to Login"): st.switch_page("Home.py")
+    st.stop()
+
+user = st.session_state.user_email
 
 with st.sidebar:
-    st.success(f"User: {st.session_state.user_email}")
+    st.success(f"Logged in: {user}")
     if st.button("Logout", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
 
 st.title("📊 Monthly Habit Tracker")
-user = st.session_state.user_email
-today = datetime.now()
+
+# ... (Date selectors and loading logic here) ...
+
+# --- DATA EDITOR FIX ---
+# Force checkboxes for all days to prevent red triangles
+day_config = {str(d): st.column_config.CheckboxColumn(label=str(d), default=False) 
+              for d in range(1, num_days + 1)}
+
+edited_df = st.data_editor(
+    habit_df, 
+    num_rows="dynamic", 
+    use_container_width=True,
+    column_config=day_config
+)
+
+# ... (Sync logic using habit_logs) ...
 
 # 1. DATE SELECTORS
 c1, c2 = st.columns(2)
