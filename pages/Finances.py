@@ -7,7 +7,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
     st.stop()
 
-st.title("💰 Finances & Debt")
+st.set_page_config(layout="wide", page_title="Finance Overview")
 user = st.session_state.user_email
 period = datetime.now().strftime("%B %Y")
 
