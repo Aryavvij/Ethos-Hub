@@ -8,24 +8,33 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 st.title("🗓️ Weekly Planner")
 user = st.session_state.user_email
-start_date = st.date_input("Week Start (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
+start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
 
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
+    this_date = start_date + timedelta(days=i)
     with cols[i]:
-        st.markdown(f"**{day_name[:3]}**")
-        new_task = st.text_input("+", key=f"in_{i}", label_visibility="collapsed")
-        if st.button("Add", key=f"btn_{i}"):
+        # Big Styled Header
+        st.markdown(f"""<div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white;">
+            <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small></div>""", unsafe_allow_html=True)
+        
+        new_task = st.text_input("Task", key=f"in_{i}", label_visibility="collapsed")
+        if st.button("Add", key=f"btn_{i}", use_container_width=True):
             execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start) VALUES (%s, %s, %s, %s)", (user, i, new_task, start_date))
             st.rerun()
-
+        
+        st.markdown('<div style="height:300px; overflow-y:auto;">', unsafe_allow_html=True)
         tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, i, start_date))
         for tid, tname, tdone in tasks:
-            # ALIGNMENT FIX: 90% text, 10% delete button
-            c1, c2 = st.columns([0.9, 0.1])
-            c1.checkbox(tname, value=bool(tdone), key=f"chk_{tid}")
-            if c2.button("×", key=f"del_{tid}"):
+            # 9:1 Ratio for Alignment
+            t_col, d_col = st.columns([0.9, 0.1])
+            is_checked = t_col.checkbox(tname, value=bool(tdone), key=f"chk_{tid}")
+            if is_checked != bool(tdone):
+                execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (is_checked, tid))
+                st.rerun()
+            if d_col.button("×", key=f"del_{tid}"):
                 execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                 st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
