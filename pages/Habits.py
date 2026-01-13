@@ -68,25 +68,24 @@ edited_df = st.data_editor(
 
 # 4. SYNC LOGIC (Updated table name to habit_logs)
 if st.button("☁️ Sync to Supabase"):
-    with st.spinner("Updating your progress..."):
+    try:
         for h_name in edited_df.index:
-            # Skip empty rows if user added a row but didn't type a name
             if not h_name: continue
-            
             for d_str in edited_df.columns:
                 status = edited_df.loc[h_name, d_str]
                 formatted_date = f"{year}-{month_num:02d}-{int(d_str):02d}"
                 
-                # Using habit_logs which has the UNIQUE constraint
+                # We use habit_logs (the new clean table)
                 execute_query("""
                     INSERT INTO habit_logs (user_email, habit_name, log_date, status) 
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT (user_email, habit_name, log_date) 
                     DO UPDATE SET status = EXCLUDED.status
                 """, (user, h_name, formatted_date, bool(status)))
-                
-    st.success("Sync complete!")
-    st.rerun()
+        st.success("Sync complete!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Sync failed. Please refresh the page. Error: {e}")
 
 # 5. DYNAMIC METRICS
 st.markdown("---")
