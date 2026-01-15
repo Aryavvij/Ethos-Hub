@@ -86,9 +86,6 @@ with w1:
         for tname, tdone in tasks:
             st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
 
-# --- Inside Home.py Focus Section ---
-
-# Update the Financial Status block in Home.py
 with w2:
     with st.container(border=True):
         st.markdown('**💰 Financial Status**')
@@ -101,19 +98,23 @@ with w2:
             WHERE user_email=%s AND period=%s
         """, (user, period))
         
-        # Calculate Debt (9000 Fix)
-        debt_calc = fetch_query("SELECT SUM(COALESCE(amount, 0)) FROM debt WHERE user_email=%s", (user,))
+        # UPDATED DEBT CALCULATION: Total Amount - Paid Out
+        debt_calc = fetch_query("""
+            SELECT SUM(COALESCE(amount, 0) - COALESCE(paid_out, 0)) 
+            FROM debt 
+            WHERE user_email=%s
+        """, (user,))
         
         rem = budget_calc[0][0] if budget_calc and budget_calc[0][0] is not None else 0
-        debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
+        net_debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
         
         st.markdown(f"""
             <div style="margin-top:10px;">
                 <p style="margin:0; font-size:14px; color:gray;">Remaining ({period}):</p>
                 <p style="margin:0; font-size:22px; color:#76b372; font-weight:bold;">Rs {rem:,.2f}</p>
                 <hr style="margin:10px 0; border-color:#333;">
-                <p style="margin:0; font-size:14px; color:gray;">Total Debt Owed:</p>
-                <p style="margin:0; font-size:22px; color:#ff4b4b; font-weight:bold;">Rs {debt:,.2f}</p>
+                <p style="margin:0; font-size:14px; color:gray;">Total Net Debt:</p>
+                <p style="margin:0; font-size:22px; color:#ff4b4b; font-weight:bold;">Rs {net_debt:,.2f}</p>
             </div>
         """, unsafe_allow_html=True)
 
