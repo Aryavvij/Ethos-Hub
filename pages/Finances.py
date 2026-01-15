@@ -14,7 +14,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 user = st.session_state.user_email
 today = datetime.now()
 
-st.title("💰 Financial Hub")
+st.title("Financial Hub")
 
 # --- MONTH SELECTOR ---
 c1, c2 = st.columns([2, 1])
@@ -36,7 +36,7 @@ if budget_df.empty:
 
 edited_df = st.data_editor(budget_df, num_rows="dynamic", use_container_width=True, key="budget_editor")
 
-if st.button("💾 Save Budget Changes", use_container_width=True):
+if st.button("Save Budget Changes", use_container_width=True):
     execute_query("DELETE FROM finances WHERE user_email=%s AND period=%s", (user, period))
     for _, row in edited_df.iterrows():
         if row["Category"]:
@@ -59,7 +59,7 @@ with col1:
         st.info("Input spending data to see chart.")
 
 with col2:
-    st.subheader("💸 Debt Tracking")
+    st.subheader("Debt Tracking")
     # Updated Query for Category, Amount, Paid Out
     raw_debt = fetch_query("SELECT category, amount, paid_out FROM debt WHERE user_email=%s", (user,))
     debt_df = pd.DataFrame(raw_debt, columns=["Category", "Debt Amount", "Paid Out"])
@@ -69,7 +69,7 @@ with col2:
 
     edited_debt = st.data_editor(debt_df, num_rows="dynamic", use_container_width=True, key="debt_editor")
     
-    if st.button("💾 Sync Debt Data", use_container_width=True):
+    if st.button("Sync Debt Data", use_container_width=True):
         execute_query("DELETE FROM debt WHERE user_email=%s", (user,))
         for _, row in edited_debt.iterrows():
             if row["Category"]:
