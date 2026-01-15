@@ -61,7 +61,7 @@ with col_chart:
         st.info("No data yet to generate Sunburst Map.")
 
 with col_filter:
-    st.subheader("🎯 Viewport Control")
+    st.subheader("Viewport Control")
     st.write("Filter your view to specific horizons:")
     
     # Horizontal filter buttons using a radio selector styled as a menu
@@ -91,13 +91,13 @@ edited_df = st.data_editor(
     column_config={
         "Progress": st.column_config.NumberColumn("Progress %", min_value=0, max_value=100, format="%d%%"),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
-        "Priority": st.column_config.SelectboxColumn(options=["🔥 High", "⚡ Medium", "🧊 Low"]),
-        "Timeframe": st.column_config.SelectboxColumn(options=["Next Month", "6 Months", "1 Year", "Someday/Maybe"])
+        "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
+        "Timeframe": st.column_config.SelectboxColumn(options=["Next Month", "6 Months", "1 Year", "Someday", "Maybe"])
     }
 )
 
 # SYNC BUTTON (Must be Full System Sync)
-if st.button("💾 Synchronize System Blueprint", use_container_width=True):
+if st.button("Synchronize System Blueprint", use_container_width=True):
     # If the user is in a filtered view, we need to be careful not to delete the hidden rows.
     # So we fetch all data, update only the filtered rows, then save.
     
