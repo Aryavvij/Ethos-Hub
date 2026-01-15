@@ -32,7 +32,6 @@ with m4:
     ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
     st.metric("Ready to Deploy", ready)
 
-# Reduced spacing
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
 # --- 4. VISUAL STRATEGY (Corrected Average Logic) ---
@@ -43,50 +42,31 @@ with col_chart:
     chart_df = df[df['Progress'] > 0].copy()
     
     if not chart_df.empty:
-        # MANUAL HIERARCHY BUILDING FOR ACCURATE AVERAGES
-        ids = ["Total System"]
-        labels = ["Total System"]
-        parents = [""]
-        values = [chart_df['Progress'].mean()]
+        # Build hierarchy with pre-calculated averages for labels
+        # but let the visual area be determined by progress
+        fig = px.sunburst(
+            chart_df, 
+            path=['Category', 'Priority', 'Description'], 
+            values='Progress',
+            color='Category',
+            color_discrete_sequence=px.colors.qualitative.Bold,
+        )
 
-        # 1. Categories
-        for cat in chart_df['Category'].unique():
-            cat_avg = chart_df[chart_df['Category'] == cat]['Progress'].mean()
-            ids.append(cat)
-            labels.append(cat)
-            parents.append("Total System")
-            values.append(cat_avg)
-
-            # 2. Priorities within Categories
-            for prio in chart_df[chart_df['Category'] == cat]['Priority'].unique():
-                p_id = f"{cat}-{prio}"
-                p_avg = chart_df[(chart_df['Category'] == cat) & (chart_df['Priority'] == prio)]['Progress'].mean()
-                ids.append(p_id)
-                labels.append(prio)
-                parents.append(cat)
-                values.append(p_avg)
-
-                # 3. Individual Tasks
-                tasks = chart_df[(chart_df['Category'] == cat) & (chart_df['Priority'] == prio)]
-                for _, row in tasks.iterrows():
-                    ids.append(row['Description'])
-                    labels.append(row['Description'])
-                    parents.append(p_id)
-                    values.append(row['Progress'])
-
-        fig = go.Figure(go.Sunburst(
-            ids=ids,
-            labels=labels,
-            parents=parents,
-            values=values,
-            branchvalues="total",
-            marker=dict(line=dict(color='#121212', width=3), colors=px.colors.qualitative.Bold),
-            hovertemplate='<b>%{label}</b><br>Avg Progress: %{value:.1f}%<extra></extra>',
+        # Update trace to show labels correctly
+        fig.update_traces(
+            marker_line_width=3,
+            marker_line_color="#121212",
+            # This ensures we see the raw progress on the slices
+            hovertemplate='<b>%{label}</b><br>Progress: %{value:.1f}%<extra></extra>',
             texttemplate='<b>%{label}</b><br>%{value:.1f}%',
             insidetextorientation='radial'
-        ))
+        )
 
-        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=500, paper_bgcolor='rgba(0,0,0,0)')
+        fig.update_layout(
+            margin=dict(t=0, l=0, r=0, b=0), 
+            height=500, 
+            paper_bgcolor='rgba(0,0,0,0)'
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No active progress to map. Add progress to your initiatives below.")
@@ -100,7 +80,8 @@ with col_filter:
     )
 
 # --- 5. INITIATIVES TABLE (TIGHT SPACING) ---
-st.markdown("<div style='margin-top:-30px;'></div>", unsafe_allow_html=True)
+# Pulled table closer to the chart
+st.markdown("<div style='margin-top:-50px;'></div>", unsafe_allow_html=True)
 st.subheader(f"Initiatives: {horizon}")
 
 if horizon == "Full System":
