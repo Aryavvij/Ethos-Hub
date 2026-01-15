@@ -6,7 +6,6 @@ from database import execute_query, fetch_query
 # 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="Blueprint", page_icon="🗺️")
 
-# 2. SAFETY GATE
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
     st.stop()
@@ -14,114 +13,99 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 user = st.session_state.user_email
 st.title("🗺️ Strategic Blueprint")
 
-# --- 3. DATA ENGINE ---
+# --- 2. DATA ENGINE ---
 raw_data = fetch_query("SELECT task_description, category, timeframe, priority, progress FROM future_tasks WHERE user_email=%s", (user,))
 df = pd.DataFrame(raw_data, columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
 
-# Ensure we have data for metrics
-if df.empty:
-    df = pd.DataFrame(columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
-
-# --- 4. PIPELINE METRICS (TOP) ---
+# --- 3. PIPELINE METRICS (TOP) ---
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.metric("Total Initiatives", len(df))
 with m2:
-    high_prio = len(df[df["Priority"].str.contains("High", na=False)])
+    high_prio = len(df[df["Priority"].str.contains("High", na=False)]) if not df.empty else 0
     st.metric("High Priority", high_prio)
 with m3:
     avg_prog = int(df["Progress"].mean()) if not df.empty else 0
     st.metric("Avg. Completion", f"{avg_prog}%")
 with m4:
-    # Logic: Tasks > 80% are "Ready to Deploy" to Weekly Planner
-    ready = len(df[df["Progress"] >= 80])
-    st.metric("Ready to Deploy", ready, help="Tasks near completion")
+    ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
+    st.metric("Ready to Deploy", ready)
 
 st.markdown("---")
 
-# --- 5. VISUAL STRATEGY & FILTERS ---
+# --- 4. VISUAL STRATEGY (The Fixed Sunburst) ---
 col_chart, col_filter = st.columns([2, 1], gap="large")
 
 with col_chart:
     st.subheader("Strategic Resource Mapping")
     if not df.empty:
-        # Sunburst: Category (Inner) -> Priority (Outer)
-        # Using progress to define the slice sizes
+        # FIX: Create a copy for the chart so we don't change the actual data
+        chart_df = df.copy()
+        
+        # FIX: Assign a minimum value of 1 to Progress for the chart 
+        # so that 0% tasks (like your first row) are still visible.
+        chart_df['Display_Size'] = chart_df['Progress'].apply(lambda x: max(x, 5))
+
+        # Professional Sunburst Construction
         fig = px.sunburst(
-            df, 
-            path=['Category', 'Priority'], 
-            values='Progress',
+            chart_df, 
+            path=['Category', 'Priority', 'Description'], # Added Description for a 3rd layer
+            values='Display_Size',
             color='Category',
-            color_discrete_sequence=px.colors.qualitative.G10,
-            template="plotly_dark"
+            color_discrete_sequence=px.colors.qualitative.Bold,
+            hover_data={'Progress': True, 'Display_Size': False} # Hide the hacky size from user
         )
-        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=350)
+        
+        fig.update_layout(
+            margin=dict(t=10, l=10, r=10, b=10), 
+            height=450,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No data yet to generate Sunburst Map.")
+        st.info("No data found. Add tasks to the table below.")
 
 with col_filter:
-    st.subheader("Viewport Control")
-    st.write("Filter your view to specific horizons:")
-    
-    # Horizontal filter buttons using a radio selector styled as a menu
+    st.subheader("🎯 Viewport Control")
     horizon = st.radio(
-        "Select Horizon",
-        ["Full System", "This Week", "Couple Weeks", "Couple Months", "This Vacation" "This Semester", "1 Year", "Someday", "Maybe"],
-        horizontal=False,
-        label_visibility="collapsed"
+        "Filter your view:",
+        ["Full System", "This Week", "Couple Weeks", "Couple Months", "This Vacation/This Semester", "1 Year", "Someday", "Maybe"],
+        horizontal=False
     )
     
-    # Filtering Logic
+    # Filter logic
     if horizon == "Full System":
         filtered_df = df
     else:
         filtered_df = df[df["Timeframe"] == horizon]
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# --- 6. MASTER INITIATIVE TABLE ---
+# --- 5. MASTER TABLE ---
 st.subheader(f"Initiatives: {horizon}")
 
 edited_df = st.data_editor(
     filtered_df,
     num_rows="dynamic",
     use_container_width=True,
-    key=f"editor_{horizon}", # Key changes with filter to reset view properly
+    key=f"editor_{horizon}",
     column_config={
         "Progress": st.column_config.NumberColumn("Progress %", min_value=0, max_value=100, format="%d%%"),
-        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Personal"]),
+        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
-        "Timeframe": st.column_config.SelectboxColumn(options=["This Week", "Couple Weeks", "Couple Months", "This Vacation" "This Semester", "1 Year", "Someday", "Maybe"])
+        "Timeframe": st.column_config.SelectboxColumn(options=["This Week", "Couple Weeks", "Couple Months", "This Vacation/This Semester", "1 Year", "Someday", "Maybe"])
     }
 )
 
-# SYNC BUTTON (Must be Full System Sync)
-if st.button("Synchronize System Blueprint", use_container_width=True):
-    # If the user is in a filtered view, we need to be careful not to delete the hidden rows.
-    # So we fetch all data, update only the filtered rows, then save.
+if st.button("Synchronize System Blueprint", use_container_width=True, key="sync_btn"):
+    # Delete old data for this user
+    execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
     
-    # For a professional, clean sync, we'll save the currently edited rows 
-    # and merge them with the existing database data.
-    
-    if horizon == "Full System":
-        # Delete and replace all
-        execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
-        for _, row in edited_df.iterrows():
-            if row["Description"]:
-                execute_query(
-                    "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], row["Progress"])
-                )
-    else:
-        # In a filtered view, we only update the rows currently visible
-        for _, row in edited_df.iterrows():
-            if row["Description"]:
-                execute_query(
-                    """UPDATE future_tasks SET category=%s, timeframe=%s, priority=%s, progress=%s 
-                       WHERE user_email=%s AND task_description=%s""",
-                    (row["Category"], row["Timeframe"], row["Priority"], row["Progress"], user, row["Description"])
-                )
-    
-    st.success(f"Blueprint updated for {horizon}")
+    # Re-insert from the editor
+    for _, row in edited_df.iterrows():
+        if row["Description"]:
+            execute_query(
+                "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
+                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], row["Progress"])
+            )
+    st.success("Blueprint Synced.")
     st.rerun()
