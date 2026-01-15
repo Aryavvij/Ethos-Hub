@@ -3,6 +3,9 @@ import hashlib
 from datetime import datetime, timedelta  
 from database import execute_query, fetch_query
 
+# 1. SET WIDE MODE (Must be the first Streamlit command)
+st.set_page_config(layout="wide", page_title="Ethos Hub")
+
 # --- AUTH UTILS ---
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
@@ -68,7 +71,7 @@ with g3:
         st.markdown('<p style="color:#76b372; font-weight:bold;">Others</p>', unsafe_allow_html=True)
         new_pers = st.text_area("O", value=g_pers, height=100, label_visibility="collapsed", key="ot")
 
-if st.button("Update Goals"):
+if st.button("Update Goals", use_container_width=True):
     execute_query("INSERT INTO semester_goals (user_email, academic, health, personal) VALUES (%s,%s,%s,%s) ON CONFLICT (user_email) DO UPDATE SET academic=EXCLUDED.academic, health=EXCLUDED.health, personal=EXCLUDED.personal", (user, new_acad, new_health, new_pers))
     st.success("Goals updated!")
 
@@ -83,8 +86,11 @@ with w1:
         st.markdown('**📋 Today\'s Priorities**')
         t_date = datetime.now().date()
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, t_date.weekday(), t_date - timedelta(days=t_date.weekday())))
-        for tname, tdone in tasks:
-            st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
+        if tasks:
+            for tname, tdone in tasks:
+                st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
+        else:
+            st.info("No tasks for today.")
 
 with w2:
     with st.container(border=True):
@@ -98,7 +104,7 @@ with w2:
             WHERE user_email=%s AND period=%s
         """, (user, period))
         
-        # UPDATED DEBT CALCULATION: Total Amount - Paid Out
+        # Calculate Net Debt: Total Amount - Paid Out
         debt_calc = fetch_query("""
             SELECT SUM(COALESCE(amount, 0) - COALESCE(paid_out, 0)) 
             FROM debt 
@@ -122,5 +128,8 @@ with w3:
     with st.container(border=True):
         st.markdown('**🎓 Today\'s Classes**')
         classes = fetch_query("SELECT start_time, subject FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, datetime.now().strftime("%A")))
-        for ctime, csub in classes:
-            st.markdown(f"**{ctime.strftime('%H:%M')}** - {csub}")
+        if classes:
+            for ctime, csub in classes:
+                st.markdown(f"**{ctime.strftime('%H:%M')}** - {csub}")
+        else:
+            st.info("No classes today.")
