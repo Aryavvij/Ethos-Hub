@@ -1,57 +1,119 @@
 import streamlit as st
 import pandas as pd
-import calendar
-from datetime import datetime
+import plotly.express as px
 from database import execute_query, fetch_query
+from datetime import datetime, date
+import calendar
 
-# --- SAFETY GATE ---
+# 1. PAGE CONFIG
+st.set_page_config(layout="wide", page_title="Habit Lab", page_icon="📈")
+
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
     st.stop()
 
 user = st.session_state.user_email
-st.set_page_config(layout="wide", page_title="Monthly Habit Tracker")
-st.title("Monthly Habit Tracker")
+st.title("📈 Monthly Habit Tracker")
 
-# 1. SELECTORS
-c1, c2 = st.columns(2)
-month_name = c1.selectbox("Month", list(calendar.month_name)[1:], index=datetime.now().month-1)
-year = c2.selectbox("Year", [2025, 2026], index=1)
+# --- 2. DATE SELECTORS ---
+col_m, col_y = st.columns(2)
+with col_m:
+    month_name = st.selectbox("Month", list(calendar.month_name)[1:], index=datetime.now().month-1)
+    month_num = list(calendar.month_name).index(month_name)
+with col_y:
+    year = st.number_input("Year", min_value=2024, max_value=2030, value=datetime.now().year)
 
-month_num = list(calendar.month_name).index(month_name)
-num_days = calendar.monthrange(year, month_num)[1]
-days_list = [str(i) for i in range(1, num_days + 1)]
+days_in_month = calendar.monthrange(year, month_num)[1]
 
-# 2. LOAD DATA
-db_habits = fetch_query("SELECT DISTINCT habit_name FROM habit_logs WHERE user_email=%s", (user,))
-all_habits = list(set(["Brushing Morning",] + [row[0] for row in db_habits]))
-habit_df = pd.DataFrame(False, index=all_habits, columns=days_list)
+# --- 3. DATA ENGINE ---
+# Fetch existing data for current month
+raw_habits = fetch_query(
+    "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
+    (user, month_num, year)
+)
 
-db_data = fetch_query("SELECT habit_name, EXTRACT(DAY FROM log_date)::int, status FROM habit_logs WHERE user_email=%s AND EXTRACT(MONTH FROM log_date)=%s AND EXTRACT(YEAR FROM log_date)=%s", (user, month_num, year))
-for h_name, d_num, stat in db_data:
-    if h_name in habit_df.index: habit_df.at[h_name, str(d_num)] = bool(stat)
+# Initialize Pivot Table
+habit_list = ["Brushing Morning", "Book Reading", "Coursera Video", "7 Hour Sleep", 
+              "Minimum Sugar", "Protein Goal", "Brushing Night", "Gym/Training", 
+              "Teeth Gel", "Attended Classes", "Bath", "Jogging"]
 
-# 3. EDITOR (Checkbox Fix)
-day_config = {d: st.column_config.CheckboxColumn(label=d, default=False) for d in days_list}
-edited_df = st.data_editor(habit_df, num_rows="dynamic", use_container_width=True, column_config=day_config)
+# Create empty DataFrame for the editor
+df = pd.DataFrame(index=habit_list, columns=[str(i) for i in range(1, days_in_month + 1)]).fillna(False)
 
-# 4. SYNC
-if st.button("☁️ Sync to Cloud"):
-    with st.spinner("Saving..."):
-        for h_name in edited_df.index:
-            if not h_name: continue
-            for d_str in edited_df.columns:
-                status = edited_df.loc[h_name, d_str]
-                formatted_date = f"{year}-{month_num:02d}-{int(d_str):02d}"
-                execute_query("INSERT INTO habit_logs (user_email, habit_name, log_date, status) VALUES (%s, %s, %s, %s) ON CONFLICT (user_email, habit_name, log_date) DO UPDATE SET status = EXCLUDED.status", (user, h_name, formatted_date, bool(status)))
-    st.success("Success!")
-    st.rerun()
+# Populate with DB data
+for h_name, h_day, h_status in raw_habits:
+    if h_name in df.index and str(h_day) in df.columns:
+        df.at[h_name, str(h_day)] = bool(h_status)
 
-# 5. METRICS
+# --- 4. MAIN EDITOR ---
+with st.container(border=True):
+    st.subheader(f"🗓️ {month_name} Grid")
+    edited_df = st.data_editor(
+        df,
+        use_container_width=True,
+        height=400,
+        key=f"habit_editor_{month_num}_{year}"
+    )
+
+    if st.button("☁️ Sync to Cloud", use_container_width=True):
+        execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
+        for habit, row in edited_df.iterrows():
+            for day_col, status in row.items():
+                if status:
+                    execute_query(
+                        "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (user, habit, month_num, year, int(day_col), 1)
+                    )
+        st.success("Consistency Synced.")
+        st.rerun()
+
 st.markdown("---")
-if not edited_df.empty:
-    m_cols = st.columns(4)
-    for i, habit in enumerate(edited_df.index):
-        if not habit: continue
-        score = (edited_df.loc[habit].sum() / num_days) * 100
-        m_cols[i % 4].metric(label=str(habit), value=f"{score:.1f}%")
+
+# --- 5. PERFORMANCE SUMMARY TABLE ---
+# Calculate Stats
+daily_counts = edited_df.sum(axis=0) # Total habits done per day
+total_habits = len(habit_list)
+
+stats_df = pd.DataFrame({
+    "Progress": [(count / total_habits) * 100 for count in daily_counts],
+    "Done": daily_counts,
+    "Not Done": [total_habits - count for count in daily_counts]
+}).T
+stats_df.columns = [str(i) for i in range(1, days_in_month + 1)]
+
+st.subheader("📊 Performance Statistics")
+st.data_editor(
+    stats_df,
+    use_container_width=True,
+    disabled=True,
+    column_config={col: st.column_config.NumberColumn(format="%.0f") for col in stats_df.columns}
+)
+
+# --- 6. VISUAL MOMENTUM (AREA CHART) ---
+st.markdown("<br>", unsafe_allow_html=True)
+st.subheader("🌊 Consistency Momentum")
+
+# Prepare Chart Data
+chart_data = pd.DataFrame({
+    "Day": range(1, days_in_month + 1),
+    "Completed Habits": daily_counts.values
+})
+
+fig = px.area(
+    chart_data, 
+    x="Day", 
+    y="Completed Habits",
+    title=f"Habit Completion Volume - {month_name}",
+    color_discrete_sequence=['#76b372']
+)
+
+fig.update_layout(
+    xaxis=dict(tickmode='linear', tick0=1, dtick=1),
+    yaxis=dict(range=[0, total_habits + 1]),
+    paper_bgcolor='rgba(0,0,0,0)',
+    plot_bgcolor='rgba(0,0,0,0)',
+    height=350,
+    margin=dict(l=0, r=0, t=30, b=0)
+)
+
+st.plotly_chart(fig, use_container_width=True)
