@@ -42,7 +42,7 @@ with col_chart:
     chart_df = df[df['Progress'] > 0].copy()
     
     if not chart_df.empty:
-        # We use Graph Objects for finer control over the bold lines and specific labels
+        # Create the Sunburst
         fig = px.sunburst(
             chart_df, 
             path=['Category', 'Priority', 'Description'], 
@@ -51,21 +51,22 @@ with col_chart:
             color_discrete_sequence=px.colors.qualitative.Bold,
         )
         
-        # APPLY BOLD SEPARATION AND SELECTIVE TEXT
+        # APPLY BOLD SEPARATION AND CORRECT HOVER INFO
         fig.update_traces(
-            marker_line_width=3,  # Bolder task separation
-            marker_line_color="#121212", # High contrast line
-            texttemplate="<b>%{label}</b><br>%{percentParent:.1%}", # Shows % on tasks
-            hoverinfo="label+value+percentParent"
+            marker_line_width=3,
+            marker_line_color="#121212",
+            # We use percent parent (lowercase with space) as per Plotly requirements
+            hoverinfo="label+value+percent parent",
+            # Display logic: Only show text if it's the outermost ring (leaf)
+            textinfo="label+percent parent",
+            insidetextorientation='radial'
         )
         
-        # Logic to hide text for inner layers (Category & Priority) and only show on Description
         fig.update_layout(
             margin=dict(t=10, l=10, r=10, b=10), 
             height=550,
             paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            extendpiecolors=True
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
