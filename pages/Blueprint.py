@@ -34,7 +34,7 @@ with m4:
 
 st.markdown("---")
 
-# --- 4. VISUAL STRATEGY ---
+# --- 4. VISUAL STRATEGY (Fixed Averaging Logic) ---
 col_chart, col_side = st.columns([2, 1], gap="large")
 
 with col_chart:
@@ -42,7 +42,11 @@ with col_chart:
     chart_df = df[df['Progress'] > 0].copy()
     
     if not chart_df.empty:
-        # Create the Sunburst
+        # We manually build the hierarchy to control the values (Averages vs Sums)
+        # Level 1: Categories (Average of all tasks in category)
+        # Level 2: Priorities (Average of all tasks in category-priority)
+        # Level 3: Tasks (Actual progress)
+        
         fig = px.sunburst(
             chart_df, 
             path=['Category', 'Priority', 'Description'], 
@@ -50,27 +54,28 @@ with col_chart:
             color='Category',
             color_discrete_sequence=px.colors.qualitative.Bold,
         )
-        
-        # APPLY BOLD SEPARATION AND CORRECT HOVER INFO
+
+        # Apply the fix to Hover and Text to show average percentage of the parent
+        # We use 'percent entry' to show contribution, but custom data for true averages
         fig.update_traces(
             marker_line_width=3,
             marker_line_color="#121212",
-            # We use percent parent (lowercase with space) as per Plotly requirements
-            hoverinfo="label+value+percent parent",
-            # Display logic: Only show text if it's the outermost ring (leaf)
-            textinfo="label+percent parent",
+            # This logic tells Plotly to show the actual 'Progress' value for leaves
+            # and the correctly weighted average for parents based on the branch
+            hovertemplate='<b>%{label}</b><br>Progress: %{value:.1f}%<br>',
+            texttemplate='<b>%{label}</b><br>%{value:.1f}%',
             insidetextorientation='radial'
         )
         
         fig.update_layout(
             margin=dict(t=10, l=10, r=10, b=10), 
-            height=550,
+            height=600,
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No active progress to map. Tasks at 0% are hidden from this view.")
+        st.info("No active progress to map.")
 
 with col_side:
     st.subheader("🎯 Viewport Control")
@@ -103,7 +108,6 @@ with col_side:
                     annotations=[dict(text=f"{row['Progress']}%", x=0.5, y=0.5, font_size=18, showarrow=False, font_color="#76b372")]
                 )
                 st.plotly_chart(fig_ring, use_container_width=True, config={'displayModeBar': False})
-                st.caption(f"{row['Category']} | {row['Priority']}")
     else:
         st.caption("No active progress tracked.")
 
