@@ -18,7 +18,7 @@ st.title("🗺️ Strategic Blueprint")
 raw_data = fetch_query("SELECT task_description, category, timeframe, priority, progress FROM future_tasks WHERE user_email=%s", (user,))
 df = pd.DataFrame(raw_data, columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
 
-# --- 3. PIPELINE METRICS (TOP) ---
+# --- 3. PIPELINE METRICS ---
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.metric("Total Initiatives", len(df))
@@ -34,7 +34,7 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. VISUAL STRATEGY (The Average Fix) ---
+# --- 4. VISUAL STRATEGY (Average Logic Overwrite) ---
 col_chart, col_filter = st.columns([2.5, 1], gap="small")
 
 with col_chart:
@@ -42,57 +42,45 @@ with col_chart:
     chart_data = df[df['Progress'] > 0].copy()
     
     if not chart_data.empty:
-        # STEP 1: Manually build the hierarchy with pre-calculated averages
-        ids = []
-        labels = []
-        parents = []
-        values = []
+        # STEP 1: Calculate the real averages for hover/labels
+        cat_averages = chart_data.groupby('Category')['Progress'].mean().to_dict()
+        prio_averages = chart_data.groupby(['Category', 'Priority'])['Progress'].mean().to_dict()
 
-        # Root
-        ids.append("Root")
-        labels.append("System")
-        parents.append("")
-        values.append(chart_data['Progress'].mean())
+        # STEP 2: Use px.sunburst for the visual structure (it won't crash)
+        fig = px.sunburst(
+            chart_data, 
+            path=['Category', 'Priority', 'Description'], 
+            values='Progress',
+            color='Category',
+            color_discrete_sequence=px.colors.qualitative.Bold,
+        )
 
-        # Categories
-        for cat in chart_data['Category'].unique():
-            cat_df = chart_data[chart_data['Category'] == cat]
-            cat_avg = cat_df['Progress'].mean()
-            ids.append(cat)
-            labels.append(cat)
-            parents.append("Root")
-            values.append(cat_avg)
+        # STEP 3: Overwrite the labels of the parent rings with their real averages
+        # This is a professional trick to show averages in a sum-based chart
+        new_labels = []
+        for i, label in enumerate(fig.data[0].labels):
+            parent = fig.data[0].parents[i]
+            
+            if label in cat_averages and parent == "": # It's a Category
+                avg = cat_averages[label]
+                new_labels.append(f"<b>{label}</b><br>{avg:.1f}%")
+            elif parent in cat_averages: # It's a Priority
+                # Priority average needs category+priority match
+                avg = prio_averages.get((parent, label), 0)
+                new_labels.append(f"<b>{label}</b><br>{avg:.1f}%")
+            else: # It's a Task (Leaf node)
+                # For tasks, we show the actual value from the values array
+                val = fig.data[0].values[i]
+                new_labels.append(f"<b>{label}</b><br>{val}%")
 
-            # Priorities within this Category
-            for prio in cat_df['Priority'].unique():
-                prio_df = cat_df[cat_df['Priority'] == prio]
-                prio_avg = prio_df['Progress'].mean()
-                prio_id = f"{cat}-{prio}"
-                ids.append(prio_id)
-                labels.append(prio)
-                parents.append(cat)
-                values.append(prio_avg)
-
-                # Individual Tasks
-                for _, row in prio_df.iterrows():
-                    ids.append(row['Description'])
-                    labels.append(row['Description'])
-                    parents.append(prio_id)
-                    values.append(row['Progress'])
-
-        # STEP 2: Render using Graph Objects with 'branchvalues' as 'total'
-        # This tells Plotly: "Trust my math, don't add up the children"
-        fig = go.Figure(go.Sunburst(
-            ids=ids,
-            labels=labels,
-            parents=parents,
-            values=values,
-            branchvalues="total",
-            marker=dict(line=dict(color='#121212', width=3), colors=px.colors.qualitative.Bold),
-            hovertemplate='<b>%{label}</b><br>Average: %{value:.1f}%<extra></extra>',
-            texttemplate='<b>%{label}</b><br>%{value:.1f}%',
+        fig.update_traces(
+            textinfo="text",
+            text=new_labels,
+            marker_line_width=3,
+            marker_line_color="#121212",
+            hovertemplate='<b>%{label}</b><extra></extra>',
             insidetextorientation='radial'
-        ))
+        )
 
         fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=550, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
