@@ -32,90 +32,81 @@ with m4:
     ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
     st.metric("Ready to Deploy", ready)
 
-st.markdown("---")
+# Reduced spacing
+st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. VISUAL STRATEGY (Corrected Averaging Logic) ---
-col_chart, col_filter = st.columns([2, 1], gap="large")
+# --- 4. VISUAL STRATEGY (Corrected Average Logic) ---
+col_chart, col_filter = st.columns([2.5, 1], gap="small")
 
 with col_chart:
     st.subheader("Strategic Resource Mapping")
     chart_df = df[df['Progress'] > 0].copy()
     
     if not chart_df.empty:
-        # DATA MANIPULATION FOR AVERAGES
-        # We need to build a manual hierarchy for Plotly to avoid the 'Summation' behavior
-        labels = []
-        parents = []
-        values = []
+        # MANUAL HIERARCHY BUILDING FOR ACCURATE AVERAGES
+        ids = ["Total System"]
+        labels = ["Total System"]
+        parents = [""]
+        values = [chart_df['Progress'].mean()]
 
-        # 1. Total Root (Center)
-        total_avg = chart_df['Progress'].mean()
-        labels.append("Total System")
-        parents.append("")
-        values.append(total_avg)
-
-        # 2. Categories
-        cat_group = chart_df.groupby('Category')['Progress'].mean()
-        for cat, avg in cat_group.items():
+        # 1. Categories
+        for cat in chart_df['Category'].unique():
+            cat_avg = chart_df[chart_df['Category'] == cat]['Progress'].mean()
+            ids.append(cat)
             labels.append(cat)
             parents.append("Total System")
-            values.append(avg)
+            values.append(cat_avg)
 
-            # 3. Priorities within Categories
-            prio_group = chart_df[chart_df['Category'] == cat].groupby('Priority')['Progress'].mean()
-            for prio, p_avg in prio_group.items():
-                prio_id = f"{cat} - {prio}"
-                labels.append(prio_id)
+            # 2. Priorities within Categories
+            for prio in chart_df[chart_df['Category'] == cat]['Priority'].unique():
+                p_id = f"{cat}-{prio}"
+                p_avg = chart_df[(chart_df['Category'] == cat) & (chart_df['Priority'] == prio)]['Progress'].mean()
+                ids.append(p_id)
+                labels.append(prio)
                 parents.append(cat)
                 values.append(p_avg)
 
-                # 4. Individual Tasks
+                # 3. Individual Tasks
                 tasks = chart_df[(chart_df['Category'] == cat) & (chart_df['Priority'] == prio)]
                 for _, row in tasks.iterrows():
+                    ids.append(row['Description'])
                     labels.append(row['Description'])
-                    parents.append(prio_id)
+                    parents.append(p_id)
                     values.append(row['Progress'])
 
-        # Build the Figure using Graph Objects for maximum control
         fig = go.Figure(go.Sunburst(
-            ids=labels,
-            labels=[l.split(" - ")[-1] if " - " in l else l for l in labels],
+            ids=ids,
+            labels=labels,
             parents=parents,
             values=values,
             branchvalues="total",
-            marker=dict(
-                line=dict(color='#121212', width=3),
-                colors=px.colors.qualitative.Bold
-            ),
-            hovertemplate='<b>%{label}</b><br>Average Progress: %{value:.1f}%<extra></extra>',
-            texttemplate='<b>%{label}</b><br>%{value:.1f}%'
+            marker=dict(line=dict(color='#121212', width=3), colors=px.colors.qualitative.Bold),
+            hovertemplate='<b>%{label}</b><br>Avg Progress: %{value:.1f}%<extra></extra>',
+            texttemplate='<b>%{label}</b><br>%{value:.1f}%',
+            insidetextorientation='radial'
         ))
 
-        fig.update_layout(
-            margin=dict(t=10, l=10, r=10, b=10), 
-            height=600,
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
+        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=500, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No active progress to map.")
+        st.info("No active progress to map. Add progress to your initiatives below.")
 
 with col_filter:
-    st.subheader("🎯 Viewport Control")
+    st.subheader("🎯 Viewport")
     horizon = st.radio(
-        "Filter your view:",
+        "Filter Horizon:",
         ["Full System", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"],
         horizontal=False
     )
 
-# --- 5. FILTER LOGIC & MASTER TABLE ---
+# --- 5. INITIATIVES TABLE (TIGHT SPACING) ---
+st.markdown("<div style='margin-top:-30px;'></div>", unsafe_allow_html=True)
+st.subheader(f"Initiatives: {horizon}")
+
 if horizon == "Full System":
     filtered_df = df
 else:
     filtered_df = df[df["Timeframe"] == horizon]
-
-st.subheader(f"Initiatives: {horizon}")
 
 edited_df = st.data_editor(
     filtered_df,
@@ -136,7 +127,7 @@ if st.button("Synchronize System Blueprint", use_container_width=True, key="sync
         if row["Description"]:
             execute_query(
                 "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
-                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], row["Progress"])
+                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], int(row["Progress"]))
             )
     st.success("Blueprint Synced.")
     st.rerun()
