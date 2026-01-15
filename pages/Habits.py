@@ -6,14 +6,14 @@ from datetime import datetime
 import calendar
 
 # 1. PAGE CONFIG
-st.set_page_config(layout="wide", page_title="Habit Lab", page_icon="📈")
+st.set_page_config(layout="wide", page_title="Habit Lab")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
     st.stop()
 
 user = st.session_state.user_email
-st.title("📈 Monthly Habit Tracker")
+st.title("Monthly Habit Tracker")
 
 # --- 2. DATE SELECTORS ---
 col_m, col_y = st.columns(2)
@@ -42,47 +42,52 @@ habit_list = [
 df = pd.DataFrame(index=habit_list, columns=day_cols).fillna(False)
 for h_name, h_day, h_status in raw_habits:
     if h_name in df.index and str(h_day) in df.columns:
+        # ENSURE BOOLEAN CASTING
         df.at[h_name, str(h_day)] = bool(h_status)
 
 # --- 4. MAIN EDITOR ---
 with st.container(border=True):
-    st.subheader(f"🗓️ {month_name} Habit Grid")
-    edited_df = st.data_editor(df, use_container_width=True, height=400, key="habit_editor_v3")
+    st.subheader(f"{month_name} Habit Grid")
+    edited_df = st.data_editor(df, use_container_width=True, height=400, key="habit_editor_v4")
 
-    if st.button("💾 Synchronize Habits", use_container_width=True):
+    if st.button("Synchronize Habits", use_container_width=True):
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
         for habit, row in edited_df.iterrows():
             for day_str, status in row.items():
                 if status:
+                    # FIX: Explicitly passing Python 'True' boolean
                     execute_query(
                         "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
-                        (user, habit, month_num, year, int(day_str), 1)
+                        (user, habit, month_num, year, int(day_str), True)
                     )
-        st.success("Data Synced.")
+        st.success("Data Synced Successfully.")
         st.rerun()
 
-st.markdown("---")
-
 # --- 5. PERFORMANCE STATISTICS TABLE ---
-# Calculate row-by-row stats based on the edited_df
 daily_done = edited_df.sum(axis=0).astype(int)
 total_possible = len(habit_list)
 daily_progress = ((daily_done / total_possible) * 100).round(0).astype(int)
 daily_not_done = total_possible - daily_done
 
 stats_df = pd.DataFrame({
-    "Progress %": [f"{p}%" for p in daily_progress],
+    "Progress": [f"{p}%" for p in daily_progress],
     "Done": daily_done,
     "Not Done": daily_not_done
 }).T
 stats_df.columns = day_cols
 
-st.subheader("📊 Performance Summary")
-st.table(stats_df) # Use st.table for a clean, non-editable professional look
+st.subheader("Performance Summary")
+# Using data_editor in disabled mode for a professional, horizontally scrollable summary
+st.data_editor(
+    stats_df, 
+    use_container_width=True, 
+    disabled=True,
+    key="stats_display"
+)
 
 # --- 6. VISUAL MOMENTUM CHART ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("🌊 Consistency Momentum")
+st.subheader("Consistency Momentum")
 
 chart_data = pd.DataFrame({
     "Day": range(1, days_in_month + 1),
@@ -96,9 +101,9 @@ fig = px.area(
 )
 
 fig.update_layout(
-    yaxis=dict(title="Habits Completed", range=[0, total_possible + 1]),
-    xaxis=dict(title="Day of Month", tickmode='linear', dtick=5),
-    height=300,
+    yaxis=dict(title="Habits Completed", range=[0, total_possible + 1], gridcolor="rgba(255,255,255,0.05)"),
+    xaxis=dict(title="Day of Month", tickmode='linear', dtick=5, gridcolor="rgba(255,255,255,0.05)"),
+    height=350,
     margin=dict(l=0, r=0, t=20, b=0),
     paper_bgcolor='rgba(0,0,0,0)',
     plot_bgcolor='rgba(0,0,0,0)'
