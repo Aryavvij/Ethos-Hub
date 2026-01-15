@@ -34,39 +34,63 @@ with m4:
 
 st.markdown("---")
 
-# --- 4. VISUAL STRATEGY (Fixed Averaging Logic) ---
-col_chart, col_side = st.columns([2, 1], gap="large")
+# --- 4. VISUAL STRATEGY (Corrected Averaging Logic) ---
+col_chart, col_filter = st.columns([2, 1], gap="large")
 
 with col_chart:
     st.subheader("Strategic Resource Mapping")
     chart_df = df[df['Progress'] > 0].copy()
     
     if not chart_df.empty:
-        # We manually build the hierarchy to control the values (Averages vs Sums)
-        # Level 1: Categories (Average of all tasks in category)
-        # Level 2: Priorities (Average of all tasks in category-priority)
-        # Level 3: Tasks (Actual progress)
-        
-        fig = px.sunburst(
-            chart_df, 
-            path=['Category', 'Priority', 'Description'], 
-            values='Progress',
-            color='Category',
-            color_discrete_sequence=px.colors.qualitative.Bold,
-        )
+        # DATA MANIPULATION FOR AVERAGES
+        # We need to build a manual hierarchy for Plotly to avoid the 'Summation' behavior
+        labels = []
+        parents = []
+        values = []
 
-        # Apply the fix to Hover and Text to show average percentage of the parent
-        # We use 'percent entry' to show contribution, but custom data for true averages
-        fig.update_traces(
-            marker_line_width=3,
-            marker_line_color="#121212",
-            # This logic tells Plotly to show the actual 'Progress' value for leaves
-            # and the correctly weighted average for parents based on the branch
-            hovertemplate='<b>%{label}</b><br>Progress: %{value:.1f}%<br>',
-            texttemplate='<b>%{label}</b><br>%{value:.1f}%',
-            insidetextorientation='radial'
-        )
-        
+        # 1. Total Root (Center)
+        total_avg = chart_df['Progress'].mean()
+        labels.append("Total System")
+        parents.append("")
+        values.append(total_avg)
+
+        # 2. Categories
+        cat_group = chart_df.groupby('Category')['Progress'].mean()
+        for cat, avg in cat_group.items():
+            labels.append(cat)
+            parents.append("Total System")
+            values.append(avg)
+
+            # 3. Priorities within Categories
+            prio_group = chart_df[chart_df['Category'] == cat].groupby('Priority')['Progress'].mean()
+            for prio, p_avg in prio_group.items():
+                prio_id = f"{cat} - {prio}"
+                labels.append(prio_id)
+                parents.append(cat)
+                values.append(p_avg)
+
+                # 4. Individual Tasks
+                tasks = chart_df[(chart_df['Category'] == cat) & (chart_df['Priority'] == prio)]
+                for _, row in tasks.iterrows():
+                    labels.append(row['Description'])
+                    parents.append(prio_id)
+                    values.append(row['Progress'])
+
+        # Build the Figure using Graph Objects for maximum control
+        fig = go.Figure(go.Sunburst(
+            ids=labels,
+            labels=[l.split(" - ")[-1] if " - " in l else l for l in labels],
+            parents=parents,
+            values=values,
+            branchvalues="total",
+            marker=dict(
+                line=dict(color='#121212', width=3),
+                colors=px.colors.qualitative.Bold
+            ),
+            hovertemplate='<b>%{label}</b><br>Average Progress: %{value:.1f}%<extra></extra>',
+            texttemplate='<b>%{label}</b><br>%{value:.1f}%'
+        ))
+
         fig.update_layout(
             margin=dict(t=10, l=10, r=10, b=10), 
             height=600,
@@ -77,39 +101,13 @@ with col_chart:
     else:
         st.info("No active progress to map.")
 
-with col_side:
+with col_filter:
     st.subheader("🎯 Viewport Control")
     horizon = st.radio(
         "Filter your view:",
         ["Full System", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"],
         horizontal=False
     )
-    
-    st.markdown("---")
-    
-    st.subheader("📊 Active Task Completion")
-    active_tasks = df[df['Progress'] > 0].sort_values(by="Progress", ascending=False)
-    
-    if not active_tasks.empty:
-        for idx, row in active_tasks.iterrows():
-            with st.container(border=True):
-                st.markdown(f"**{row['Description']}**")
-                
-                fig_ring = go.Figure(go.Pie(
-                    values=[row['Progress'], 100-row['Progress']],
-                    hole=.7,
-                    marker_colors=['#76b372', '#1a1a1a'],
-                    showlegend=False,
-                    textinfo='none'
-                ))
-                fig_ring.update_layout(
-                    height=140, margin=dict(t=5, b=5, l=5, r=5),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    annotations=[dict(text=f"{row['Progress']}%", x=0.5, y=0.5, font_size=18, showarrow=False, font_color="#76b372")]
-                )
-                st.plotly_chart(fig_ring, use_container_width=True, config={'displayModeBar': False})
-    else:
-        st.caption("No active progress tracked.")
 
 # --- 5. FILTER LOGIC & MASTER TABLE ---
 if horizon == "Full System":
