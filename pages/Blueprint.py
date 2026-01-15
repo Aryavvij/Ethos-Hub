@@ -21,45 +21,20 @@ with st.container(border=True):
     future_df = pd.DataFrame(raw_future, columns=["ID", "Description", "Category", "Timeframe", "Priority"])
 
     if future_df.empty:
-        # Create an empty row with None for ID
         future_df = pd.DataFrame([{"ID": None, "Description": "", "Category": "Career", "Timeframe": "Someday", "Priority": "🧊 Low"}])
 
-    # Safely drop ID column only if it exists
-    cols_to_show = [c for c in future_df.columns if c != "ID"]
-    display_df = future_df[cols_to_show]
+    # Safely drop ID for display
+    display_df = future_df.drop(columns=["ID"]) if "ID" in future_df.columns else future_df
 
     edited_future = st.data_editor(
         display_df,
         num_rows="dynamic",
         use_container_width=True,
-        key="blueprint_editor_v1" # Unique key for the editor
+        key="blueprint_editor_final"
     )
 
-    # ADDED UNIQUE KEY HERE to fix the DuplicateElementId error
-    if st.button("💾 Sync Blueprint", use_container_width=True, key="sync_blueprint_btn_unique"):
-        execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
-        for _, row in edited_future.iterrows():
-            if row["Description"]:
-                execute_query(
-                    "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority) VALUES (%s, %s, %s, %s, %s)",
-                    (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"])
-                )
-        st.success("Blueprint Synced.")
-        st.rerun()
-
-    if st.button("💾 Sync Blueprint", use_container_width=True):
-        execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
-        for _, row in edited_future.iterrows():
-            if row["Description"]:
-                execute_query(
-                    "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority) VALUES (%s, %s, %s, %s, %s)",
-                    (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"])
-                )
-        st.success("Blueprint Synced.")
-        st.rerun()
-
-    if st.button("💾 Sync Blueprint", use_container_width=True):
-        # Transactional Save
+    # FIXED: Added unique key to resolve DuplicateElementId
+    if st.button("💾 Sync Blueprint", use_container_width=True, key="sync_blueprint_unique_btn"):
         execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
         for _, row in edited_future.iterrows():
             if row["Description"]:
