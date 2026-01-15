@@ -34,42 +34,70 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. VISUAL STRATEGY (Corrected Average Logic) ---
+# --- 4. VISUAL STRATEGY (The Average Fix) ---
 col_chart, col_filter = st.columns([2.5, 1], gap="small")
 
 with col_chart:
     st.subheader("Strategic Resource Mapping")
-    chart_df = df[df['Progress'] > 0].copy()
+    chart_data = df[df['Progress'] > 0].copy()
     
-    if not chart_df.empty:
-        # Build hierarchy with pre-calculated averages for labels
-        # but let the visual area be determined by progress
-        fig = px.sunburst(
-            chart_df, 
-            path=['Category', 'Priority', 'Description'], 
-            values='Progress',
-            color='Category',
-            color_discrete_sequence=px.colors.qualitative.Bold,
-        )
+    if not chart_data.empty:
+        # STEP 1: Manually build the hierarchy with pre-calculated averages
+        ids = []
+        labels = []
+        parents = []
+        values = []
 
-        # Update trace to show labels correctly
-        fig.update_traces(
-            marker_line_width=3,
-            marker_line_color="#121212",
-            # This ensures we see the raw progress on the slices
-            hovertemplate='<b>%{label}</b><br>Progress: %{value:.1f}%<extra></extra>',
+        # Root
+        ids.append("Root")
+        labels.append("System")
+        parents.append("")
+        values.append(chart_data['Progress'].mean())
+
+        # Categories
+        for cat in chart_data['Category'].unique():
+            cat_df = chart_data[chart_data['Category'] == cat]
+            cat_avg = cat_df['Progress'].mean()
+            ids.append(cat)
+            labels.append(cat)
+            parents.append("Root")
+            values.append(cat_avg)
+
+            # Priorities within this Category
+            for prio in cat_df['Priority'].unique():
+                prio_df = cat_df[cat_df['Priority'] == prio]
+                prio_avg = prio_df['Progress'].mean()
+                prio_id = f"{cat}-{prio}"
+                ids.append(prio_id)
+                labels.append(prio)
+                parents.append(cat)
+                values.append(prio_avg)
+
+                # Individual Tasks
+                for _, row in prio_df.iterrows():
+                    ids.append(row['Description'])
+                    labels.append(row['Description'])
+                    parents.append(prio_id)
+                    values.append(row['Progress'])
+
+        # STEP 2: Render using Graph Objects with 'branchvalues' as 'total'
+        # This tells Plotly: "Trust my math, don't add up the children"
+        fig = go.Figure(go.Sunburst(
+            ids=ids,
+            labels=labels,
+            parents=parents,
+            values=values,
+            branchvalues="total",
+            marker=dict(line=dict(color='#121212', width=3), colors=px.colors.qualitative.Bold),
+            hovertemplate='<b>%{label}</b><br>Average: %{value:.1f}%<extra></extra>',
             texttemplate='<b>%{label}</b><br>%{value:.1f}%',
             insidetextorientation='radial'
-        )
+        ))
 
-        fig.update_layout(
-            margin=dict(t=0, l=0, r=0, b=0), 
-            height=500, 
-            paper_bgcolor='rgba(0,0,0,0)'
-        )
+        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=550, paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No active progress to map. Add progress to your initiatives below.")
+        st.info("No active progress to map.")
 
 with col_filter:
     st.subheader("🎯 Viewport")
@@ -79,15 +107,11 @@ with col_filter:
         horizontal=False
     )
 
-# --- 5. INITIATIVES TABLE (TIGHT SPACING) ---
-# Pulled table closer to the chart
+# --- 5. INITIATIVES TABLE ---
 st.markdown("<div style='margin-top:-50px;'></div>", unsafe_allow_html=True)
 st.subheader(f"Initiatives: {horizon}")
 
-if horizon == "Full System":
-    filtered_df = df
-else:
-    filtered_df = df[df["Timeframe"] == horizon]
+filtered_df = df if horizon == "Full System" else df[df["Timeframe"] == horizon]
 
 edited_df = st.data_editor(
     filtered_df,
