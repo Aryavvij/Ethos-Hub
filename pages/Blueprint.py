@@ -67,7 +67,7 @@ with col_filter:
     # Horizontal filter buttons using a radio selector styled as a menu
     horizon = st.radio(
         "Select Horizon",
-        ["Full System", "Next Month", "6 Months", "1 Year", "Someday/Maybe"],
+        ["Full System", "This Week", "Couple Weeks", "Couple Months", "This Vacation" "This Semester", "1 Year", "Someday", "Maybe"],
         horizontal=False,
         label_visibility="collapsed"
     )
@@ -90,9 +90,9 @@ edited_df = st.data_editor(
     key=f"editor_{horizon}", # Key changes with filter to reset view properly
     column_config={
         "Progress": st.column_config.NumberColumn("Progress %", min_value=0, max_value=100, format="%d%%"),
-        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
+        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
-        "Timeframe": st.column_config.SelectboxColumn(options=["Next Month", "6 Months", "1 Year", "Someday", "Maybe"])
+        "Timeframe": st.column_config.SelectboxColumn(options=["This Week", "Couple Weeks", "Couple Months", "This Vacation" "This Semester", "1 Year", "Someday", "Maybe"])
     }
 )
 
