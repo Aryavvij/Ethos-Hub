@@ -13,7 +13,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 user = st.session_state.user_email
 
-st.title("🏋️ Iron Clad")
+st.title("Iron Clad")
 st.caption("Physical Performance & PR Repository")
 
 # --- 3. BODY METRICS (TOP ROW) ---
@@ -34,13 +34,12 @@ st.markdown("---")
 
 # --- 4. DAILY LIFT LOG (MIDDLE) ---
 st.subheader("Daily Training Log")
-st.info("Input your exercises for today below. Use 'Add Row' to log more movements.")
 
 # We use the Data Editor for that "Excel" feel you like
 log_data = pd.DataFrame([{"Exercise": "", "Weight (kg)": 0.0, "Reps": 0, "Sets": 0}])
 edited_log = st.data_editor(log_data, num_rows="dynamic", use_container_width=True, key="daily_lift_editor")
 
-if st.button("💾 Archive Workout", use_container_width=True):
+if st.button("Save Workout", use_container_width=True):
     # Logic to save daily workout can be added here if you want a history table
     st.success("Workout Archived to System.")
 
@@ -48,7 +47,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("---")
 
 # --- 5. THE WALL OF FAME (PR TROPHY ROOM) ---
-st.subheader("🏆 The Wall of Fame (Personal Records)")
+st.subheader("🏆 The Wall of Fame")
 
 # Fetch existing PRs
 raw_prs = fetch_query("SELECT id, exercise_name, weight, reps, date_achieved FROM personal_records WHERE user_email=%s ORDER BY weight DESC", (user,))
@@ -62,7 +61,7 @@ edited_prs = st.data_editor(
     key="pr_editor"
 )
 
-if st.button("🔥 Update Wall of Fame", use_container_width=True):
+if st.button("Update Wall of Fame", use_container_width=True):
     # Sync PRs to database
     execute_query("DELETE FROM personal_records WHERE user_email=%s", (user,))
     for _, row in edited_prs.iterrows():
