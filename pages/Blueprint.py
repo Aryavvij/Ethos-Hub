@@ -15,63 +15,67 @@ st.title("🗺️ Strategic Blueprint")
 # DATA ENGINE
 raw_data = fetch_query("SELECT task_description, category, timeframe, priority, progress FROM future_tasks WHERE user_email=%s", (user,))
 df = pd.DataFrame(raw_data, columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
-df['Status Bar'] = df['Progress']
 
-# --- 3. TOP LEVEL OVERVIEW (Metrics) ---
-m1, m2, m3, m4 = st.columns(4)
-with m1:
-    st.metric("Total Initiatives", len(df))
-with m2:
-    high_prio = len(df[df["Priority"].str.contains("High", na=False)]) if not df.empty else 0
-    st.metric("High Priority", high_prio)
-with m3:
-    avg_prog = int(df["Progress"].mean()) if not df.empty else 0
-    st.metric("Avg. Completion", f"{avg_prog}%")
-with m4:
-    ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
-    st.metric("Ready to Deploy", ready)
-
-st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-
-# STRATEGY MAP
+# --- 4. THE STRATEGY BRIDGE (RESTORED PERCENTAGES) ---
 st.subheader("Strategic Resource Mapping")
 if not df.empty:
-    fig = px.sunburst(df, path=['Category', 'Priority', 'Description'], values='Progress', color='Category', color_discrete_sequence=px.colors.qualitative.Bold)
-    # FIX: Restore bold separation lines
-    fig.update_traces(marker_line_width=3, marker_line_color="#121212", insidetextorientation='radial')
+    # Adding a display label for the Sunburst that includes the %
+    chart_df = df.copy()
+    chart_df['Display_Label'] = chart_df['Description'].str.upper() + "<br>" + chart_df['Progress'].astype(str) + "%"
+    
+    fig = px.sunburst(
+        chart_df, 
+        path=['Category', 'Priority', 'Display_Label'], 
+        values='Progress', 
+        color='Category', 
+        color_discrete_sequence=px.colors.qualitative.Bold
+    )
+    
+    # Restore Bold separation lines and percentage visibility
+    fig.update_traces(
+        marker_line_width=3, 
+        marker_line_color="#121212", 
+        insidetextorientation='radial',
+        textinfo="label" # This ensures our Display_Label (Name + %) shows up
+    )
     fig.update_layout(margin=dict(t=10, l=10, r=10, b=10), height=550, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
 
-# --- 5. SYSTEM MASTER TABLE (FIXED ORDER) ---
+# --- 5. SYSTEM MASTER TABLE (CONSOLIDATED STATUS) ---
 st.subheader("System Master Table")
-
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
-
-# FIX: Define filter_choice BEFORE display_df
 filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
 
-# Create visual column
-df['Visual Progress'] = df['Progress']
-
-# Now this will not throw a NameError
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
+# COLUMN CONFIGURATION: Consolidating the last 3 columns into one interactive 'Status'
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
-    key="blueprint_editor",
+    key="blueprint_editor_v2",
     column_config={
-        "Visual Progress": st.column_config.ProgressColumn(
-            "Status",
-            min_value=0, max_value=100, format="" 
-        ),
-        "Progress": st.column_config.NumberColumn(
-            "Edit %",
-            min_value=0, max_value=100, format="%d", step=1
+        "Progress": st.column_config.ProgressColumn(
+            "Status & Progress",
+            help="Slide the bar to update percentage",
+            min_value=0,
+            max_value=100,
+            format="%d%%", # This shows the % alongside the bar
+            step=1,
         ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
         "Timeframe": st.column_config.SelectboxColumn(options=time_options[1:])
     }
 )
+
+if st.button("Synchronize System Blueprint", use_container_width=True):
+    execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
+    for _, row in edited_df.iterrows():
+        if row["Description"]:
+            execute_query(
+                "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
+                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], int(row["Progress"]))
+            )
+    st.success("Blueprint Synced.")
+    st.rerun()
