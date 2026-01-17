@@ -43,32 +43,29 @@ if not df.empty:
     st.plotly_chart(fig, use_container_width=True)
 
 # MASTER TABLE
+# --- 5. SYSTEM MASTER TABLE (INTERACTIVE PROGRESS) ---
 st.subheader("System Master Table")
-time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
-filter_choice = st.selectbox("🎯 Filter", options=time_options)
+
+# Display logic
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
-# FIX: Separate columns. Status Bar removes duplicate % via format=""
+# COLUMN CONFIGURATION
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
-    key="bp_editor",
+    key="blueprint_editor",
     column_config={
-        "Status Bar": st.column_config.ProgressColumn("Status", min_value=0, max_value=100, format=""),
-        "Progress": st.column_config.NumberColumn("Manual %", min_value=0, max_value=100, format="%d"),
+        "Progress": st.column_config.ProgressColumn(
+            "Strategic Progress",
+            help="Drag the bar to update completion percentage",
+            min_value=0,
+            max_value=100,
+            format="%d%%", # This shows the % inside/alongside the bar
+            step=1,
+        ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
         "Timeframe": st.column_config.SelectboxColumn(options=time_options[1:])
     }
 )
-
-if st.button("Synchronize System Blueprint", use_container_width=True):
-    execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
-    for _, row in edited_df.iterrows():
-        if row["Description"]:
-            execute_query(
-                "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
-                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], int(row["Progress"]))
-            )
-    st.rerun()
