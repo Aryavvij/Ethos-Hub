@@ -16,24 +16,22 @@ st.title("🏆 The Pantheon")
 st.caption("Personal Rankings & Global Hierarchies")
 
 # --- 3. INPUT SECTION (TOP) ---
+# --- PANTHEON ADDER ---
 with st.container(border=True):
-    st.subheader("📝 Management")
+    st.subheader("Add to the Pantheon")
+    # Using specific ratios: 2 parts for inputs, 1 part for the action
     c1, c2, c3 = st.columns([2, 2, 1])
     
     with c1:
-        cat_to_edit = st.text_input("Category Name", placeholder="e.g. Best Books, Top Restaurants")
+        cat_name = st.text_input("Category", placeholder="e.g., Best Books")
     with c2:
-        item_to_add = st.text_input("Add Item", placeholder="e.g. The Great Gatsby")
+        item_name = st.text_input("Item Name", placeholder="e.g., Meditations")
     with c3:
-        st.write(" ") # Alignment spacer
-        if st.button("➕ Add to List", use_container_width=True):
-            if cat_to_edit and item_to_add:
-                # Find current max rank to put it at the end
-                existing = fetch_query("SELECT COUNT(*) FROM rankings WHERE user_email=%s AND category=%s", (user, cat_to_edit))
-                new_rank = existing[0][0] if existing else 0
-                execute_query("INSERT INTO rankings (user_email, category, item_name, rank_order) VALUES (%s, %s, %s, %s)",
-                             (user, cat_to_edit, item_to_add, new_rank))
-                st.rerun()
+        # This invisible spacer pushes the button down to align with the text boxes
+        st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
+        if st.button("➕ Add Item", use_container_width=True):
+            # Save logic here
+            st.rerun()
 
 st.markdown("---")
 
