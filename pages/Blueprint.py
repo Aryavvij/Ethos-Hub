@@ -42,27 +42,33 @@ if not df.empty:
     fig.update_layout(margin=dict(t=10, l=10, r=10, b=10), height=550, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
 
-# MASTER TABLE
-# --- 5. SYSTEM MASTER TABLE (INTERACTIVE PROGRESS) ---
+# --- 5. SYSTEM MASTER TABLE (FIXED ORDER) ---
 st.subheader("System Master Table")
 
-# Display logic
+time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
+
+# FIX: Define filter_choice BEFORE display_df
+filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
+
+# Create visual column
+df['Visual Progress'] = df['Progress']
+
+# Now this will not throw a NameError
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
-# COLUMN CONFIGURATION
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
     key="blueprint_editor",
     column_config={
-        "Progress": st.column_config.ProgressColumn(
-            "Strategic Progress",
-            help="Drag the bar to update completion percentage",
-            min_value=0,
-            max_value=100,
-            format="%d%%", # This shows the % inside/alongside the bar
-            step=1,
+        "Visual Progress": st.column_config.ProgressColumn(
+            "Status",
+            min_value=0, max_value=100, format="" 
+        ),
+        "Progress": st.column_config.NumberColumn(
+            "Edit %",
+            min_value=0, max_value=100, format="%d", step=1
         ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
