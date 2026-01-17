@@ -84,10 +84,10 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE (With Integrated Filter & Editing) ---
+# --- 5. SYSTEM MASTER TABLE (Integrated Filtering & Editing) ---
 st.subheader("System Master Table")
 
-# Integrated Timeframe Filter
+# Timeframe Filter logic
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
 filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
 
@@ -96,6 +96,8 @@ if filter_choice == "All":
 else:
     display_df = df[df["Timeframe"] == filter_choice]
 
+# COLUMN CONFIGURATION
+# We use NumberColumn so you can double-click and type the % manually
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
@@ -104,10 +106,11 @@ edited_df = st.data_editor(
     column_config={
         "Progress": st.column_config.NumberColumn(
             "Progress %",
-            help="Double-click to edit completion percentage",
-            format="%d%%",
+            help="Double-click to set completion (0-100)",
+            format="%d%%", # This keeps the % symbol visible
             min_value=0,
             max_value=100,
+            step=1,
         ),
         "Category": st.column_config.SelectboxColumn(
             options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]
@@ -122,7 +125,7 @@ edited_df = st.data_editor(
 )
 
 if st.button("Synchronize System Blueprint", use_container_width=True):
-    # If filtering is on, we update the main DF with edited changes before saving
+    # Update main dataframe with edited results before saving
     if filter_choice != "All":
         df.update(edited_df)
     else:
