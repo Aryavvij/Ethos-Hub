@@ -32,6 +32,7 @@ with st.expander("➕ Add New Event"):
                           (user, e_date, e_desc, False))
             st.rerun()
 
+# --- 6. CALENDAR GRID (FIXED BOX SYMMETRY) ---
 st.markdown("---")
 cal_matrix = calendar.monthcalendar(year, month_num)
 day_headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -45,9 +46,9 @@ for week in cal_matrix:
     for i, day in enumerate(week):
         if day != 0:
             with cols[i]:
-                # FIX: 120px locked height for symmetry. Removed action buttons.
+                # FIX: Fixed 120px height for symmetry. Event is FORCED inside.
                 st.markdown(f"""
-                    <div style="height: 120px; border: 1px solid #333; border-radius: 8px; padding: 8px; background: rgba(255,255,255,0.02); overflow-y: auto;">
+                    <div style="height: 120px; border: 1px solid #333; border-radius: 8px; padding: 8px; background: rgba(255,255,255,0.02); overflow: hidden;">
                         <p style="margin:0; font-weight:bold; font-size:14px; color:#aaa;">{day}</p>
                 """, unsafe_allow_html=True)
                 
@@ -56,11 +57,13 @@ for week in cal_matrix:
                 
                 for desc, is_done in events:
                     txt_c = "#76b372" if is_done else "#ff4b4b"
+                    # FIX: Forced inside the box with specific padding and height
                     st.markdown(f"""
                         <div style="font-size:10px; color:{txt_c}; background:rgba(0,0,0,0.2); 
                         padding:2px 5px; border-radius:3px; margin-top:4px; border-left:2px solid {txt_c};
-                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;">
                             {desc.upper()}
                         </div>
                     """, unsafe_allow_html=True)
+                
                 st.markdown('</div>', unsafe_allow_html=True)
