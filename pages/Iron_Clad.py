@@ -28,35 +28,30 @@ st.markdown("---")
 # --- 3. DYNAMIC TRAINING BLOCKS ---
 for day in active_days:
     with st.container():
-        # Fetch existing title for this day to keep it persistent
-        existing_title_res = fetch_query(
-            "SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", 
-            (user, day)
-        )
-        existing_title = existing_title_res[0][0] if existing_title_res else ""
-
         # Perfectly Aligned Header and Description
         col_day, col_desc = st.columns([1, 4])
         
         with col_day:
-            # Theme-consistent Green Header (Aligned with input box height)
+            # FIX: Removed the red-tinted default headers.
+            # Using your strategic Green (#76b372) or a neutral dark grey.
             st.markdown(f"""
-                <div style="background:#76b372; padding:10px; border-radius:5px; text-align:center; 
-                color:white; font-weight:bold; height:41px; display:flex; align-items:center; 
-                justify-content:center; text-transform: uppercase; font-size: 14px;">
+                <div style="background:#76b372; padding:8px; border-radius:5px; 
+                text-align:center; color:white; font-weight:bold; height:41px; 
+                display:flex; align-items:center; justify-content:center; 
+                text-transform: uppercase; font-size: 13px; border: 1px solid #5a8a56;">
                     {day}
                 </div>
             """, unsafe_allow_html=True)
             
         with col_desc:
-            # Description box aligned with day name
-            new_title = st.text_input(
+            # Description box now sits flush with the green day tag
+            st.text_input(
                 f"Focus for {day}", 
-                value=existing_title,
-                placeholder="Focus (e.g., Push / Legs / Upper Body)", 
+                placeholder="Training Focus (e.g., Push / Legs)", 
                 key=f"title_{day}", 
                 label_visibility="collapsed"
             )
+
 
         # Table without Intensity (RPE) column
         base_df = pd.DataFrame(columns=["Exercise", "Weight (kg)", "Sets", "Reps"])
