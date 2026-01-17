@@ -19,7 +19,7 @@ st.markdown("### ⚙️ Split Configuration")
 active_days = st.multiselect(
     "Select your active training days:",
     ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    default=["Monday", "Wednesday", "Friday"],
+    default=["Monday", "Tuesday", "Wednesday", "Friday"],
     help="Only selected days will appear below."
 )
 
