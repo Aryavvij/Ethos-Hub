@@ -33,37 +33,34 @@ with st.expander("➕ Add New Event"):
             st.rerun()
 
 # --- 6. CALENDAR GRID (FIXED BOX SYMMETRY) ---
-st.markdown("---")
+# --- 6. CALENDAR GRID (SPACING FIX) ---
+st.markdown("""
+    <style>
+    /* Adjust horizontal gap between columns */
+    div[data-testid="stHorizontalBlock"] {
+        gap: 10px !important; 
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 cal_matrix = calendar.monthcalendar(year, month_num)
-day_headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-header_cols = st.columns(7)
-
-for i, d in enumerate(day_headers):
-    header_cols[i].markdown(f"<p style='text-align:center; color:#76b372; font-weight:bold; font-size:16px; margin-bottom:0px;'>{d}</p>", unsafe_allow_html=True)
-
-# --- 6. CALENDAR GRID (BOX-INTERNAL EVENTS) ---
 for week in cal_matrix:
-    cols = st.columns(7)
+    cols = st.columns(7) # Streamlit default gap is now overridden to 10px
     for i, day in enumerate(week):
         if day != 0:
             with cols[i]:
-                # THE FIX: One single div for everything. Event is forced INSIDE.
                 cur_date = f"{year}-{month_num:02d}-{day:02d}"
                 events = fetch_query("SELECT description, is_done FROM events WHERE user_email=%s AND event_date=%s", (user, cur_date))
                 
                 content = f'<p style="margin:0; font-weight:bold; font-size:14px; color:#aaa;">{day}</p>'
                 for desc, is_done in events:
                     txt_c = "#76b372" if is_done else "#ff4b4b"
-                    content += f"""
-                        <div style="font-size:10px; color:{txt_c}; background:rgba(0,0,0,0.2); 
-                        padding:2px 5px; border-radius:3px; margin-top:4px; border-left:2px solid {txt_c};
-                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            {desc.upper()}
-                        </div>
-                    """
+                    content += f'<div style="font-size:10px; color:{txt_c}; margin-top:4px;">• {desc.upper()}</div>'
                 
+                # margin-bottom: 10px matches the horizontal gap set above
                 st.markdown(f"""
-                    <div style="height: 120px; border: 1px solid #333; border-radius: 8px; padding: 8px; background: rgba(255,255,255,0.02); overflow-y: auto;">
+                    <div style="height: 120px; border: 1px solid #333; border-radius: 8px; 
+                    padding: 8px; background: rgba(255,255,255,0.02); overflow: hidden; margin-bottom: 10px;">
                         {content}
                     </div>
                 """, unsafe_allow_html=True)
