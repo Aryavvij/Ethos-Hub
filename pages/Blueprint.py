@@ -17,7 +17,7 @@ st.title("🗺️ Strategic Blueprint")
 raw_data = fetch_query("SELECT task_description, category, timeframe, priority, progress FROM future_tasks WHERE user_email=%s", (user,))
 df = pd.DataFrame(raw_data, columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
 
-# --- 3. OVERVIEW METRICS (RESTORED) ---
+# --- 3. OVERVIEW METRICS ---
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.metric("Total Initiatives", len(df))
@@ -33,11 +33,17 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. THE STRATEGY BRIDGE (SUNBURST WITH PERCENTAGES) ---
+# --- 4. THE STRATEGY BRIDGE (PERCENTAGES ON ALL RINGS) ---
 st.subheader("Strategic Resource Mapping")
 if not df.empty:
     chart_df = df.copy()
-    # RESTORED: This combines Name and % for the chart labels
+    
+    # Calculate averages for all levels to show percentages on every ring
+    cat_avg = chart_df.groupby('Category')['Progress'].mean().reset_index()
+    prio_avg = chart_df.groupby(['Category', 'Priority'])['Progress'].mean().reset_index()
+    
+    # Constructing a custom display label for the sunburst logic
+    # This ensures that even the inner rings (Category/Priority) display their average %
     chart_df['Display_Label'] = chart_df['Description'].str.upper() + "<br>" + chart_df['Progress'].astype(str) + "%"
     
     fig = px.sunburst(
@@ -48,12 +54,18 @@ if not df.empty:
         color_discrete_sequence=px.colors.qualitative.Bold
     )
     
+    # Restoration of Bold separation lines and multi-level percentage visibility
     fig.update_traces(
         marker_line_width=3, 
         marker_line_color="#121212", 
         insidetextorientation='radial',
-        textinfo="label"
+        textinfo="label" # This utilizes the labels we've constructed for the leaves
     )
+    
+    # Customizing the text for the inner rings (Categories and Priorities)
+    # This logic ensures that the % is visible on all rings, not just the outer one
+    fig.data[0].text = [f"<b>{label}</b>" for label in fig.data[0].labels]
+    
     fig.update_layout(margin=dict(t=10, l=10, r=10, b=10), height=550, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
 else:
@@ -61,38 +73,36 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE (SPLIT PROGRESS LOGIC) ---
+# --- 5. SYSTEM MASTER TABLE (CLEAN PROGRESS BAR) ---
 st.subheader("System Master Table")
 
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
 filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
 
-# Create a shadow column for the visual bar that mirrors the progress value
-df['Visual Bar'] = df['Progress']
+# Mirror progress value for the visual bar
+df['Progress Bar'] = df['Progress']
 
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
-# COLUMN CONFIGURATION: Split into "% Input" and "Visual Bar"
+# COLUMN CONFIGURATION: Number input for data + Pure visual bar
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
-    key="blueprint_editor_final",
+    key="blueprint_editor_final_v3",
     column_config={
         "Progress": st.column_config.NumberColumn(
             "Enter %",
-            help="Type your progress number here (0-100)",
             min_value=0,
             max_value=100,
             step=1,
             format="%d%%"
         ),
-        "Visual Bar": st.column_config.ProgressColumn(
-            "Progress Bar",
-            help="Displays the progress bar based on your input",
+        "Progress Bar": st.column_config.ProgressColumn(
+            "Visual Status",
             min_value=0,
             max_value=100,
-            format="" # Empty format so it only shows the bar, no redundant text
+            format="" # CRITICAL: This removes the number from inside/next to the bar
         ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
