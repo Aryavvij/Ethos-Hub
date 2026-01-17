@@ -32,11 +32,9 @@ with st.expander("➕ Add New Event"):
                           (user, e_date, e_desc, False))
             st.rerun()
 
-# --- 6. CALENDAR GRID (FIXED BOX SYMMETRY) ---
-# --- 6. CALENDAR GRID (SPACING FIX) ---
+# --- 6. CALENDAR GRID (CLEAN RED HIGHLIGHT) ---
 st.markdown("""
     <style>
-    /* Adjust horizontal gap between columns */
     div[data-testid="stHorizontalBlock"] {
         gap: 10px !important; 
     }
@@ -45,19 +43,32 @@ st.markdown("""
 
 cal_matrix = calendar.monthcalendar(year, month_num)
 for week in cal_matrix:
-    cols = st.columns(7) # Streamlit default gap is now overridden to 10px
+    cols = st.columns(7)
     for i, day in enumerate(week):
         if day != 0:
             with cols[i]:
                 cur_date = f"{year}-{month_num:02d}-{day:02d}"
                 events = fetch_query("SELECT description, is_done FROM events WHERE user_email=%s AND event_date=%s", (user, cur_date))
                 
-                content = f'<p style="margin:0; font-weight:bold; font-size:14px; color:#aaa;">{day}</p>'
-                for desc, is_done in events:
-                    txt_c = "#76b372" if is_done else "#ff4b4b"
-                    content += f'<div style="font-size:10px; color:{txt_c}; margin-top:4px;">• {desc.upper()}</div>'
+                # Header for the date
+                content = f'<p style="margin:0 0 5px 0; font-weight:bold; font-size:14px; color:#aaa;">{day}</p>'
                 
-                # margin-bottom: 10px matches the horizontal gap set above
+                for desc, is_done in events:
+                    # Logic: Red for pending, Green for done
+                    bg = "rgba(118, 179, 114, 0.2)" if is_done else "rgba(255, 75, 75, 0.2)"
+                    txt_c = "#76b372" if is_done else "#ff4b4b"
+                    
+                    # RESTORED: Full block highlight, no dots, uppercase text
+                    content += f"""
+                        <div style="font-size:10px; color:{txt_c}; background:{bg}; 
+                        padding:3px 6px; border-radius:3px; margin-bottom:4px; 
+                        border-left:3px solid {txt_c}; white-space: nowrap; 
+                        overflow: hidden; text-overflow: ellipsis; font-weight: bold;">
+                            {desc.upper()}
+                        </div>
+                    """
+                
+                # Fixed 120px box with 10px bottom margin for perfect grid spacing
                 st.markdown(f"""
                     <div style="height: 120px; border: 1px solid #333; border-radius: 8px; 
                     padding: 8px; background: rgba(255,255,255,0.02); overflow: hidden; margin-bottom: 10px;">
