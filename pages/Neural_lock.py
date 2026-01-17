@@ -15,11 +15,12 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 user = st.session_state.user_email
 
 # --- 2. DATA ENGINE ---
-# Fetch daily totals for the current month for the Momentum Graph
+# Fetch daily totals for the current month
 monthly_raw = fetch_query("""
     SELECT EXTRACT(DAY FROM session_date) as day, SUM(duration_mins) 
     FROM focus_sessions 
     WHERE user_email=%s AND EXTRACT(MONTH FROM session_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+    AND EXTRACT(YEAR FROM session_date) = EXTRACT(YEAR FROM CURRENT_DATE)
     GROUP BY day ORDER BY day
 """, (user,))
 m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
@@ -30,7 +31,8 @@ st.caption("High-Intensity Focus Engine")
 # --- 3. OVERVIEW METRICS ---
 m1, m2, m3 = st.columns(3)
 with m1:
-    today_mins = m_df[m_df["Day"] == datetime.now().day]["Mins"].sum()
+    today_day = datetime.now().day
+    today_mins = m_df[m_df["Day"] == today_day]["Mins"].sum()
     st.metric("Focus Today", f"{int(today_mins)}m")
 with m2:
     month_avg = int(m_df["Mins"].mean()) if not m_df.empty else 0
@@ -39,14 +41,21 @@ with m3:
     status = "🔴 IDLE" if 'stopwatch_start' not in st.session_state or st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
     st.metric("System Status", status)
 
-# --- 4. MONTHLY MOMENTUM GRAPH ---
+# --- 4. MONTHLY MOMENTUM GRAPH (Fixing X-Axis Decimals) ---
 st.subheader("🌊 Monthly Focus Momentum")
 if not m_df.empty:
     fig_m = px.area(m_df, x="Day", y="Mins", color_discrete_sequence=['#76b372'], template="plotly_dark")
     fig_m.update_layout(
         height=250, margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showgrid=False, title="Day of Month"), yaxis=dict(showgrid=True, title="Minutes")
+        xaxis=dict(
+            showgrid=False, 
+            title="Day of Month",
+            tickmode='linear',
+            tick0=1,
+            dtick=1  # Forces whole numbers only (1, 2, 3...)
+        ), 
+        yaxis=dict(showgrid=True, title="Minutes")
     )
     st.plotly_chart(fig_m, use_container_width=True)
 else:
@@ -84,6 +93,7 @@ with col_timer:
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
+            # Log the session with current month/year for the graph
             execute_query(
                 "INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)",
                 (user, task_name, duration_mins)
