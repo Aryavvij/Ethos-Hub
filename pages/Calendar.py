@@ -42,7 +42,7 @@ with st.expander("➕ Add New Event"):
             execute_query("INSERT INTO events (user_email, event_date, description) VALUES (%s, %s, %s)", (user, e_date, e_desc))
             st.rerun()
 
-# 6. CALENDAR GRID
+# --- 6. CALENDAR GRID ---
 st.markdown("---")
 cal_matrix = calendar.monthcalendar(year, month_num)
 day_headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -56,40 +56,40 @@ for week in cal_matrix:
     for i, day in enumerate(week):
         if day != 0:
             with cols[i]:
-                # FIXED HEIGHT CONTAINER to keep the grid symmetrical
+                # 1. FIXED HEIGHT BORDERED CONTAINER
                 with st.container(border=True):
                     st.markdown(f"<p style='margin-bottom:5px;'><strong>{day}</strong></p>", unsafe_allow_html=True)
                     
-                    # Scrollable area with FIXED HEIGHT to stop the box from growing
-                    st.markdown('<div style="height:110px; overflow-y:auto; overflow-x:hidden;">', unsafe_allow_html=True)
+                    # 2. OVERFLOW DIV: This prevents the box from growing
+                    st.markdown('<div style="height:100px; overflow-y:auto; overflow-x:hidden;">', unsafe_allow_html=True)
                     
                     cur_date = f"{year}-{month_num:02d}-{day:02d}"
                     events = fetch_query("SELECT id, description, is_done FROM events WHERE user_email=%s AND event_date=%s", (user, cur_date))
                     
                     for eid, desc, is_done in events:
-                        # 3-column ratio for Text, Status, and Delete
-                        ec1, ec2, ec3 = st.columns([0.7, 0.15, 0.15])
+                        # 3. ALIGNMENT FIX: Vertical alignment is set by the column padding
+                        # Ratio [0.6, 0.2, 0.2] gives buttons enough room to be centered
+                        ec1, ec2, ec3 = st.columns([0.6, 0.2, 0.2])
                         
                         with ec1:
-                            # Color logic for the badge based on status
-                            bg_color = "rgba(118, 179, 114, 0.2)" if is_done else "rgba(255, 75, 75, 0.1)"
-                            text_color = "#76b372" if is_done else "#ff4b4b"
-                            
-                            st.markdown(f"""<div style='background:{bg_color}; 
-                                         color:{text_color}; padding:2px 5px; border-radius:3px; 
-                                         font-size:10px; margin-bottom:4px; border-left: 3px solid {text_color};
-                                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>
+                            # Event Badge
+                            bg = "rgba(118, 179, 114, 0.2)" if is_done else "rgba(255, 75, 75, 0.1)"
+                            txt_c = "#76b372" if is_done else "#ff4b4b"
+                            st.markdown(f"""<div style='background:{bg}; color:{txt_c}; padding:2px 5px; 
+                                         border-radius:3px; font-size:10px; margin-bottom:4px; 
+                                         border-left: 3px solid {txt_c}; white-space: nowrap; 
+                                         overflow: hidden; text-overflow: ellipsis; height: 28px; line-height: 24px;'>
                                          {desc}</div>""", unsafe_allow_html=True)
                         
                         with ec2:
-                            # Status Check (Green)
-                            if st.button("✔", key=f"done_{eid}"):
+                            # PERFECT CENTERING: use_container_width + custom height
+                            if st.button("✔", key=f"done_{eid}", use_container_width=True):
                                 execute_query("UPDATE events SET is_done=True WHERE id=%s", (eid,))
                                 st.rerun()
                                 
                         with ec3:
-                            # Delete Cross (Red)
-                            if st.button("×", key=f"del_{eid}"):
+                            if st.button("✖", key=f"del_{eid}", use_container_width=True):
                                 execute_query("DELETE FROM events WHERE id=%s", (eid,))
                                 st.rerun()
+
                     st.markdown('</div>', unsafe_allow_html=True)
