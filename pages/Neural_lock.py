@@ -14,26 +14,46 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 user = st.session_state.user_email
 
-# --- 2. DATA ENGINE ---
-# Fetch daily totals for the current month
-monthly_raw = fetch_query("""
-    SELECT EXTRACT(DAY FROM session_date) as day, SUM(duration_mins) 
-    FROM focus_sessions 
-    WHERE user_email=%s AND EXTRACT(MONTH FROM session_date) = EXTRACT(MONTH FROM CURRENT_DATE)
-    AND EXTRACT(YEAR FROM session_date) = EXTRACT(YEAR FROM CURRENT_DATE)
-    GROUP BY day ORDER BY day
-""", (user,))
-m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
-
 st.title("🔒 Neural Lock")
 st.caption("High-Intensity Focus Engine")
 
-# --- 3. OVERVIEW METRICS ---
+# --- 2. MONTHLY SELECTOR ENGINE ---
+# This allows you to view historical data by selecting month/year
+c_sel1, c_sel2 = st.columns([2, 1])
+with c_sel1:
+    month_names = ["January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
+    # Default to current month
+    selected_month_name = st.selectbox("View Results for Month", month_names, index=datetime.now().month-1)
+    month_num = month_names.index(selected_month_name) + 1
+with c_sel2:
+    # Default to current year (2026)
+    selected_year = st.selectbox("Year", [2025, 2026, 2027], index=1)
+
+# --- 3. DATA ENGINE (Filtered by Selection) ---
+monthly_raw = fetch_query("""
+    SELECT EXTRACT(DAY FROM session_date) as day, SUM(duration_mins) 
+    FROM focus_sessions 
+    WHERE user_email=%s 
+    AND EXTRACT(MONTH FROM session_date) = %s 
+    AND EXTRACT(YEAR FROM session_date) = %s
+    GROUP BY day ORDER BY day
+""", (user, month_num, selected_year))
+
+m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
+
+# --- 4. OVERVIEW METRICS ---
 m1, m2, m3 = st.columns(3)
 with m1:
-    today_day = datetime.now().day
-    today_mins = m_df[m_df["Day"] == today_day]["Mins"].sum()
-    st.metric("Focus Today", f"{int(today_mins)}m")
+    # Logic: Show "Today" only if viewing the current month/year
+    if month_num == datetime.now().month and selected_year == datetime.now().year:
+        today_day = datetime.now().day
+        today_mins = m_df[m_df["Day"] == today_day]["Mins"].sum()
+        st.metric("Focus Today", f"{int(today_mins)}m")
+    else:
+        month_total = m_df["Mins"].sum()
+        st.metric(f"Total Focus ({selected_month_name[:3]})", f"{int(month_total)}m")
+        
 with m2:
     month_avg = int(m_df["Mins"].mean()) if not m_df.empty else 0
     st.metric("Monthly Daily Avg", f"{month_avg}m")
@@ -41,32 +61,31 @@ with m3:
     status = "🔴 IDLE" if 'stopwatch_start' not in st.session_state or st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
     st.metric("System Status", status)
 
-# --- 4. MONTHLY MOMENTUM GRAPH ---
-st.subheader("🌊 Monthly Focus Momentum")
+# --- 5. MONTHLY MOMENTUM GRAPH ---
+st.subheader(f"🌊 Focus Momentum: {selected_month_name} {selected_year}")
 if not m_df.empty:
     fig_m = px.area(m_df, x="Day", y="Mins", color_discrete_sequence=['#76b372'], template="plotly_dark")
     
-    # THE FIX: Force Linear Integer Ticks
     fig_m.update_layout(
         height=250, margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(
             showgrid=False, 
             title="Day of Month",
-            tickmode='linear',  # Forces specific tick placement
-            tick0=1,            # Starts at 1
-            dtick=1,            # Forces increments of 1 (no decimals)
-            range=[1, 31]       # Matches the full month view
+            tickmode='linear', 
+            tick0=1, 
+            dtick=1, 
+            range=[1, 31]
         ), 
         yaxis=dict(showgrid=True, title="Minutes")
     )
     st.plotly_chart(fig_m, use_container_width=True)
 else:
-    st.info("Initiate focus sessions to visualize monthly momentum.")
+    st.info(f"No focus sessions recorded for {selected_month_name} {selected_year}.")
 
 st.markdown("---")
 
-# --- 5. THE ENGINE ROOM (STOPWATCH & DAILY LOG) ---
+# --- 6. THE ENGINE ROOM (STOPWATCH & DAILY LOG) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
 with col_timer:
@@ -96,7 +115,6 @@ with col_timer:
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
-            # Log the session with current month/year for the graph
             execute_query(
                 "INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)",
                 (user, task_name, duration_mins)
@@ -104,21 +122,19 @@ with col_timer:
             st.session_state.stopwatch_start = None
             st.rerun()
 
-        while st.session_state.stopwatch_start is not None:
-            elapsed = int(time.time() - st.session_state.stopwatch_start)
-            mins, secs = divmod(elapsed, 60)
-            timer_placeholder.markdown(f"""
-                <div style="text-align: center; border: 2px solid #76b372; padding: 40px; border-radius: 15px; background: rgba(118, 179, 114, 0.05);">
-                    <h1 style="font-size: 60px; color: #76b372; margin: 0; font-family: monospace;">{mins:02d}:{secs:02d}</h1>
-                    <p style="color: #76b372; letter-spacing: 5px; font-weight: bold;">LOCKED ON: {task_name.upper()}</p>
-                </div>
-            """, unsafe_allow_html=True)
-            time.sleep(1)
+        # Simple timer display logic
+        elapsed = int(time.time() - st.session_state.stopwatch_start)
+        mins, secs = divmod(elapsed, 60)
+        timer_placeholder.markdown(f"""
+            <div style="text-align: center; border: 2px solid #76b372; padding: 40px; border-radius: 15px; background: rgba(118, 179, 114, 0.05);">
+                <h1 style="font-size: 60px; color: #76b372; margin: 0; font-family: monospace;">{mins:02d}:{secs:02d}</h1>
+                <p style="color: #76b372; letter-spacing: 5px; font-weight: bold;">LOCKED ON: {task_name.upper()}</p>
+            </div>
+        """, unsafe_allow_html=True)
 
 with col_log:
     st.subheader("📋 Today's Logged Sessions")
     
-    # FIX: Ensure task_name is selected in the query
     today_data = fetch_query("""
         SELECT task_name, duration_mins 
         FROM focus_sessions 
@@ -127,25 +143,15 @@ with col_log:
     """, (user,))
     
     if today_data:
-        # Create the DataFrame with explicit column names
         log_df = pd.DataFrame(today_data, columns=["Objective / Task", "Duration (Mins)"])
-        
-        # Display with specific column configuration for better readability
         st.dataframe(
             log_df,
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Objective / Task": st.column_config.TextColumn(
-                    "Objective / Task",
-                    help="The focus objective you defined for this session",
-                    width="large", # Gives more room for descriptions
-                ),
-                "Duration (Mins)": st.column_config.NumberColumn(
-                    "Mins",
-                    format="%d m"
-                )
+                "Objective / Task": st.column_config.TextColumn("Objective / Task", width="large"),
+                "Duration (Mins)": st.column_config.NumberColumn("Mins", format="%d m")
             }
         )
     else:
-        st.caption("No sessions logged today. Initiate a lock to begin.")
+        st.caption("No sessions logged today.")
