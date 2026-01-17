@@ -51,32 +51,35 @@ for i, day_name in enumerate(days):
         tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
                             (user, i, start_date))
         
-        # Task List Rendering - PERFECT CENTERING FIX
+        # --- TASK LIST RENDERING: COLLISION & ALIGNMENT FIX ---
         for tid, tname, tdone in tasks:
-            # Ratios [0.1, 0.8, 0.1] lock buttons into centered positions
-            c1, c2, c3 = st.columns([0.1, 0.8, 0.1])
+            # We use a tighter ratio [0.15, 0.7, 0.15] to prevent wrapping 
+            # and ensure the buttons stay parallel even on small screens
+            c1, c2, c3 = st.columns([0.15, 0.7, 0.15])
             
             with c1:
+                # Centered Tick
                 if st.button("✔", key=f"done_{tid}", use_container_width=True):
-                    execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
+                    execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
                     st.rerun()
             
             with c2:
                 status_color = "#76b372" if tdone else "#ff4b4b"
                 bg_opacity = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
                 
-                # Height 38px matches standard Streamlit button height for perfect alignment
+                # CSS FIX: Precise height and line-height for vertical centering
                 st.markdown(f"""
                     <div style="background:{bg_opacity}; color:{status_color}; 
-                    border: 1px solid {status_color}; border-radius: 4px; padding: 5px; 
-                    text-align: center; font-weight: bold; font-size: 11px; 
-                    height: 38px; line-height: 28px; white-space: nowrap; 
-                    overflow: hidden; text-overflow: ellipsis;">
+                    border: 1px solid {status_color}; border-radius: 4px; padding: 0px 2px; 
+                    text-align: center; font-weight: bold; font-size: 10px; 
+                    height: 35px; line-height: 33px; white-space: nowrap; 
+                    overflow: hidden; text-overflow: ellipsis; display: block;">
                         {tname.upper()}
                     </div>
                 """, unsafe_allow_html=True)
             
             with c3:
+                # Centered Cross
                 if st.button("✖", key=f"del_{tid}", use_container_width=True):
                     execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                     st.rerun()
