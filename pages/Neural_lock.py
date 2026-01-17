@@ -41,19 +41,22 @@ with m3:
     status = "🔴 IDLE" if 'stopwatch_start' not in st.session_state or st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
     st.metric("System Status", status)
 
-# --- 4. MONTHLY MOMENTUM GRAPH (Fixing X-Axis Decimals) ---
+# --- 4. MONTHLY MOMENTUM GRAPH ---
 st.subheader("🌊 Monthly Focus Momentum")
 if not m_df.empty:
     fig_m = px.area(m_df, x="Day", y="Mins", color_discrete_sequence=['#76b372'], template="plotly_dark")
+    
+    # THE FIX: Force Linear Integer Ticks
     fig_m.update_layout(
         height=250, margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(
             showgrid=False, 
             title="Day of Month",
-            tickmode='linear',
-            tick0=1,
-            dtick=1  # Forces whole numbers only (1, 2, 3...)
+            tickmode='linear',  # Forces specific tick placement
+            tick0=1,            # Starts at 1
+            dtick=1,            # Forces increments of 1 (no decimals)
+            range=[1, 31]       # Matches the full month view
         ), 
         yaxis=dict(showgrid=True, title="Minutes")
     )
