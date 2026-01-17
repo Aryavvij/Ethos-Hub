@@ -109,7 +109,6 @@ with b2:
         st.success(f"**TRAINING:** {split_name}")
         
         # Calendar Event
-        st.markdown("---")
         events = fetch_query("SELECT description FROM events WHERE user_email=%s AND event_date=%s", (user, t_date))
         if events:
             for ev in events:
@@ -127,7 +126,6 @@ with b3:
         st.info(f"**NEXT:** {up_task}")
         
         # Study/Focus Time (Neural Lock)
-        st.markdown("---")
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
         st.metric("Focus Today", f"{mins}m")
