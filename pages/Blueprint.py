@@ -33,18 +33,16 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. THE STRATEGY BRIDGE (FIXED: ALL RINGS SHOW AVG %) ---
+# --- 4. THE STRATEGY BRIDGE (FIXED: GLOBAL PRIORITY AVERAGING) ---
 st.subheader("Strategic Resource Mapping")
 if not df.empty:
     chart_df = df.copy()
     
-    # 1. Calculate Averages for the Rings
+    # 1. Calculate Global Averages
     cat_avg = chart_df.groupby('Category')['Progress'].mean().to_dict()
-    # Calculate Priority average within each category
-    prio_avg = chart_df.groupby(['Category', 'Priority'])['Progress'].mean().reset_index()
+    # This calculates the average for "High", "Medium", "Low" across the ENTIRE system
+    global_prio_avg = chart_df.groupby('Priority')['Progress'].mean().to_dict()
     
-    # 2. Build the path labels manually to force percentages onto inner rings
-    # We use plotly's ability to handle hierarchical labels
     fig = px.sunburst(
         chart_df, 
         path=['Category', 'Priority', 'Description'], 
@@ -53,25 +51,24 @@ if not df.empty:
         color_discrete_sequence=px.colors.qualitative.Bold
     )
 
-    # 3. Logic to update the labels on EVERY ring
+    # 2. Logic to update the labels on EVERY ring with Global Averaging
     new_labels = []
     for i, label in enumerate(fig.data[0].labels):
         parent = fig.data[0].parents[i]
         
-        # If it's a Category (Root level)
+        # CATEGORY LEVEL (Inner Ring)
         if label in cat_avg and parent == "":
             new_labels.append(f"<b>{label.upper()}</b><br>{int(cat_avg[label])}%")
         
-        # If it's a Priority (Middle level)
+        # PRIORITY LEVEL (Middle Ring - GLOBAL AVERAGE)
         elif label in ["High", "Medium", "Low"]:
-            # Find the specific average for this priority under its specific category parent
-            val = prio_avg[(prio_avg['Priority'] == label) & (prio_avg['Category'] == parent)]['Progress']
-            avg_val = int(val.values[0]) if not val.empty else 0
+            # Uses the global average regardless of which category it sits in
+            avg_val = int(global_prio_avg.get(label, 0))
             new_labels.append(f"<b>{label}</b><br>{avg_val}%")
             
-        # If it's a Task (Outer level)
+        # DESCRIPTION LEVEL (Outer Ring - INDIVIDUAL PROGRESS)
         else:
-            # Get the progress value for this specific leaf
+            # We must find the specific progress for this task leaf
             val = fig.data[0].values[i]
             new_labels.append(f"<b>{label.upper()}</b><br>{int(val)}%")
 
@@ -90,7 +87,7 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE (CLEAN: ONE PROGRESS COLUMN) ---
+# --- 5. SYSTEM MASTER TABLE (CLEAN: MANUAL % ONLY) ---
 st.subheader("System Master Table")
 
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
@@ -98,16 +95,15 @@ filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_optio
 
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
-# COLUMN CONFIGURATION: Only one editable column for progress
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
-    key="blueprint_final_locked",
+    key="blueprint_global_avg_locked",
     column_config={
         "Progress": st.column_config.NumberColumn(
             "Manual %",
-            help="Type your progress (0-100). The chart will update on sync.",
+            help="Type progress (0-100). Chart uses global averages for priorities.",
             min_value=0,
             max_value=100,
             step=1,
