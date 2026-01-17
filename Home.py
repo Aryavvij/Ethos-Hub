@@ -77,16 +77,19 @@ if st.button("Update Goals", use_container_width=True):
 
 st.markdown("---")
 
-# 2. TODAY'S FOCUS SECTION (Integrated Priorities)
-st.markdown("### ⚡ Today's Focus")
+# --- 2. THE 4-BOX INTEGRATED COMMAND CENTER ---
+st.markdown("### ⚡ Today's System Briefing")
+
+# Time logic for data pulling
 t_date = datetime.now().date()
 d_name = t_date.strftime("%A")
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
-w1, w2, w3, w4 = st.columns(4)
+b1, b2, b3, b4 = st.columns(4)
 
-with w1:
+# BOX 1: DAILY TASKS (From Weekly Page)
+with b1:
     with st.container(border=True):
         st.markdown('**📋 Daily Tasks**')
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
@@ -96,27 +99,41 @@ with w1:
         else:
             st.caption("No tasks for today.")
 
-with w2:
+# BOX 2: PERFORMANCE & EVENTS (From Iron Clad & Calendar)
+with b2:
     with st.container(border=True):
-        st.markdown('**🛡️ Training Split**')
-        # Fetch only the title name from your Iron Clad splitting logic
+        st.markdown('**🛡️ Performance & Events**')
+        # Training Split
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
-        if split_res and split_res[0][0]:
-            st.success(f"**{split_res[0][0].upper()}**")
-        else:
-            st.caption("No training split defined.")
-
-with w3:
-    with st.container(border=True):
-        st.markdown('**📆 Calendar Events**')
+        split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
+        st.success(f"**TRAINING:** {split_name}")
+        
+        # Calendar Event
+        st.markdown("---")
         events = fetch_query("SELECT description FROM events WHERE user_email=%s AND event_date=%s", (user, t_date))
         if events:
             for ev in events:
-                st.markdown(f"🔔 {ev[0]}")
+                st.warning(f"🔔 {ev[0]}")
         else:
-            st.caption("No events today.")
+            st.caption("No calendar events.")
 
-with w4:
+# BOX 3: STRATEGY & INTELLECT (From Blueprint & Neural Lock)
+with b3:
+    with st.container(border=True):
+        st.markdown('**🧠 Strategy & Intellect**')
+        # Upcoming Task (Blueprint) - Lowest Progress high-priority or next task
+        upcoming = fetch_query("SELECT task_description FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 1", (user,))
+        up_task = upcoming[0][0] if upcoming else "All clear"
+        st.info(f"**NEXT:** {up_task}")
+        
+        # Study/Focus Time (Neural Lock)
+        st.markdown("---")
+        focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
+        mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
+        st.metric("Focus Today", f"{mins}m")
+
+# BOX 4: ACADEMIC TIMETABLE
+with b4:
     with st.container(border=True):
         st.markdown('**🎓 Classes**')
         classes = fetch_query("SELECT start_time, subject FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, d_name))
@@ -124,9 +141,7 @@ with w4:
             for ctime, csub in classes:
                 st.markdown(f"**{ctime.strftime('%H:%M')}** - {csub}")
         else:
-            st.caption("No classes today.")
-
-st.markdown("---")
+            st.caption("No classes scheduled today.")
 
 # 3. FINANCIAL OVERVIEW
 st.markdown("### 💰 Financial Status")
