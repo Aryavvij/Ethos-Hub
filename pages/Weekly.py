@@ -39,29 +39,46 @@ for i, day_name in enumerate(days):
         
         # Input Section
         new_task = st.text_input("Task", key=f"in_{i}", label_visibility="collapsed", placeholder="+ New Task")
-        if st.button("Add", key=f"btn_{i}", use_container_width=True):
+        if st.button("Add Task", key=f"btn_{i}", use_container_width=True):
             if new_task:
-                execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start) VALUES (%s, %s, %s, %s)", (user, i, new_task, start_date))
+                execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, %s)", 
+                              (user, i, new_task, start_date, False))
                 st.rerun()
         
         st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
         
         # Pull tasks from database
-        tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, i, start_date))
+        tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
+                            (user, i, start_date))
         
-        # ALIGNMENT FIX: Vertical loop for tasks
+        # Task List Rendering
         for tid, tname, tdone in tasks:
-            # We use a 4-to-1 ratio to keep the delete button small and aligned
-            t_col, d_col = st.columns([0.75, 0.25])
+            # 3-Column Layout: Status Toggle, Task Text, Delete
+            # Ratios [0.15, 0.7, 0.15] ensure icons are small and text is centered
+            c1, c2, c3 = st.columns([0.15, 0.7, 0.15])
             
-            with t_col:
-                # Task Button (Acts as a status toggle)
-                if st.button(f"{style}{tname}", key=f"chk_{tid}", use_container_width=True):
-                    execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
+            with c1:
+                # Green Tick for Done
+                if st.button("✔", key=f"done_{tid}", help="Mark as Done"):
+                    execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
                     st.rerun()
             
-            with d_col:
-                # Delete Button - Now perfectly sized and aligned with the task button
-                if st.button("×", key=f"del_{tid}", help="Delete Task", use_container_width=True):
+            with c2:
+                # Dynamic Style based on status
+                bg = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
+                txt = "#76b372" if tdone else "#ff4b4b"
+                label = "DONE" if tdone else "PENDING"
+                
+                st.markdown(f"""
+                    <div style="background:{bg}; color:{txt}; padding:4px; border-radius:4px; 
+                    font-size:11px; text-align:center; border: 1px solid {txt}; 
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 30px; line-height: 20px;">
+                        {tname.upper()}
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            with c3:
+                # Red Cross for Delete / Mark Not Done
+                if st.button("✖", key=f"del_{tid}", help="Delete Task"):
                     execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                     st.rerun()
