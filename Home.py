@@ -3,7 +3,7 @@ import hashlib
 from datetime import datetime, timedelta  
 from database import execute_query, fetch_query
 
-# 1. SET WIDE MODE (Must be the first Streamlit command)
+# 1. SET WIDE MODE
 st.set_page_config(layout="wide", page_title="Ethos Hub")
 
 # --- AUTH UTILS ---
@@ -77,59 +77,70 @@ if st.button("Update Goals", use_container_width=True):
 
 st.markdown("---")
 
-# 2. TODAY'S FOCUS SECTION
-st.markdown("### Today's Focus")
-w1, w2, w3 = st.columns(3)
+# 2. TODAY'S FOCUS SECTION (Integrated Priorities)
+st.markdown("### ⚡ Today's Focus")
+t_date = datetime.now().date()
+d_name = t_date.strftime("%A")
+d_idx = t_date.weekday()
+w_start = t_date - timedelta(days=d_idx)
+
+w1, w2, w3, w4 = st.columns(4)
 
 with w1:
     with st.container(border=True):
-        st.markdown('**📋 Today\'s Priorities**')
-        t_date = datetime.now().date()
-        tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, t_date.weekday(), t_date - timedelta(days=t_date.weekday())))
+        st.markdown('**📋 Daily Tasks**')
+        tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
             for tname, tdone in tasks:
                 st.markdown(f"{'✅' if tdone else '⭕'} {tname}")
         else:
-            st.info("No tasks for today.")
+            st.caption("No tasks for today.")
 
 with w2:
     with st.container(border=True):
-        st.markdown('**💰 Financial Status**')
-        period = datetime.now().strftime("%B %Y")
-        
-        # Calculate Remaining Budget
-        budget_calc = fetch_query("""
-            SELECT SUM(COALESCE(plan, 0) - COALESCE(actual, 0)) 
-            FROM finances 
-            WHERE user_email=%s AND period=%s
-        """, (user, period))
-        
-        # Calculate Net Debt: Total Amount - Paid Out
-        debt_calc = fetch_query("""
-            SELECT SUM(COALESCE(amount, 0) - COALESCE(paid_out, 0)) 
-            FROM debt 
-            WHERE user_email=%s
-        """, (user,))
-        
-        rem = budget_calc[0][0] if budget_calc and budget_calc[0][0] is not None else 0
-        net_debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
-        
-        st.markdown(f"""
-            <div style="margin-top:10px;">
-                <p style="margin:0; font-size:14px; color:gray;">Remaining ({period}):</p>
-                <p style="margin:0; font-size:22px; color:#76b372; font-weight:bold;">Rs {rem:,.2f}</p>
-                <hr style="margin:10px 0; border-color:#333;">
-                <p style="margin:0; font-size:14px; color:gray;">Total Net Debt:</p>
-                <p style="margin:0; font-size:22px; color:#ff4b4b; font-weight:bold;">Rs {net_debt:,.2f}</p>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown('**🛡️ Training Split**')
+        # Fetch only the title name from your Iron Clad splitting logic
+        split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
+        if split_res and split_res[0][0]:
+            st.success(f"**{split_res[0][0].upper()}**")
+        else:
+            st.caption("No training split defined.")
 
 with w3:
     with st.container(border=True):
-        st.markdown('**🎓 Today\'s Classes**')
-        classes = fetch_query("SELECT start_time, subject FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, datetime.now().strftime("%A")))
+        st.markdown('**📆 Calendar Events**')
+        events = fetch_query("SELECT description FROM events WHERE user_email=%s AND event_date=%s", (user, t_date))
+        if events:
+            for ev in events:
+                st.markdown(f"🔔 {ev[0]}")
+        else:
+            st.caption("No events today.")
+
+with w4:
+    with st.container(border=True):
+        st.markdown('**🎓 Classes**')
+        classes = fetch_query("SELECT start_time, subject FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, d_name))
         if classes:
             for ctime, csub in classes:
                 st.markdown(f"**{ctime.strftime('%H:%M')}** - {csub}")
         else:
-            st.info("No classes today.")
+            st.caption("No classes today.")
+
+st.markdown("---")
+
+# 3. FINANCIAL OVERVIEW
+st.markdown("### 💰 Financial Status")
+f1, f2 = st.columns(2)
+period = t_date.strftime("%B %Y")
+
+with f1:
+    with st.container(border=True):
+        budget_calc = fetch_query("SELECT SUM(COALESCE(plan, 0) - COALESCE(actual, 0)) FROM finances WHERE user_email=%s AND period=%s", (user, period))
+        rem = budget_calc[0][0] if budget_calc and budget_calc[0][0] is not None else 0
+        st.markdown(f"<p style='color:gray;margin:0;'>Remaining ({period})</p><h2 style='color:#76b372;margin:0;'>Rs {rem:,.2f}</h2>", unsafe_allow_html=True)
+
+with f2:
+    with st.container(border=True):
+        debt_calc = fetch_query("SELECT SUM(COALESCE(amount, 0) - COALESCE(paid_out, 0)) FROM debt WHERE user_email=%s", (user,))
+        net_debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
+        st.markdown(f"<p style='color:gray;margin:0;'>Total Net Debt</p><h2 style='color:#ff4b4b;margin:0;'>Rs {net_debt:,.2f}</h2>", unsafe_allow_html=True)
