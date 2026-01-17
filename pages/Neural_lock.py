@@ -114,8 +114,35 @@ with col_timer:
 
 with col_log:
     st.subheader("📋 Today's Logged Sessions")
-    today_data = fetch_query("SELECT task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE ORDER BY id DESC", (user,))
+    
+    # FIX: Ensure task_name is selected in the query
+    today_data = fetch_query("""
+        SELECT task_name, duration_mins 
+        FROM focus_sessions 
+        WHERE user_email=%s AND session_date = CURRENT_DATE 
+        ORDER BY id DESC
+    """, (user,))
+    
     if today_data:
-        st.dataframe(pd.DataFrame(today_data, columns=["Task", "Minutes"]), use_container_width=True, hide_index=True)
+        # Create the DataFrame with explicit column names
+        log_df = pd.DataFrame(today_data, columns=["Objective / Task", "Duration (Mins)"])
+        
+        # Display with specific column configuration for better readability
+        st.dataframe(
+            log_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Objective / Task": st.column_config.TextColumn(
+                    "Objective / Task",
+                    help="The focus objective you defined for this session",
+                    width="large", # Gives more room for descriptions
+                ),
+                "Duration (Mins)": st.column_config.NumberColumn(
+                    "Mins",
+                    format="%d m"
+                )
+            }
+        )
     else:
-        st.caption("No sessions logged today.")
+        st.caption("No sessions logged today. Initiate a lock to begin.")
