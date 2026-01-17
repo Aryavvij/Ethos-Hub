@@ -34,15 +34,15 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. THE STRATEGY BRIDGE (Centered Sunburst) ---
-# We center the chart by putting it in a middle column or just giving it full width
+# --- 4. THE STRATEGY BRIDGE (Centered Sunburst with Global Averages) ---
 st.subheader("Strategic Resource Mapping")
 chart_data = df[df['Progress'] > 0].copy()
 
 if not chart_data.empty:
-    # Build hierarchy correctly for Averages
+    # GLOBAL AVERAGES CALCULATION
+    # This ensures "Medium" shows the same avg across all categories
     cat_averages = chart_data.groupby('Category')['Progress'].mean().to_dict()
-    prio_averages = chart_data.groupby(['Category', 'Priority'])['Progress'].mean().to_dict()
+    prio_global_avg = chart_data.groupby('Priority')['Progress'].mean().to_dict()
 
     fig = px.sunburst(
         chart_data, 
@@ -52,15 +52,20 @@ if not chart_data.empty:
         color_discrete_sequence=px.colors.qualitative.Bold,
     )
 
-    # Apply the visual labels we perfected earlier
     new_labels = []
     for i, label in enumerate(fig.data[0].labels):
         parent = fig.data[0].parents[i]
+        
+        # 1. Category Level (Outer root)
         if label in cat_averages and parent == "":
             new_labels.append(f"<b>{label}</b><br>{cat_averages[label]:.1f}%")
-        elif parent in cat_averages:
-            avg = prio_averages.get((parent, label), 0)
+        
+        # 2. Priority Level (Global Average Logic)
+        elif label in ["High", "Medium", "Low"]:
+            avg = prio_global_avg.get(label, 0)
             new_labels.append(f"<b>{label}</b><br>{avg:.1f}%")
+            
+        # 3. Task Level (Actual Progress)
         else:
             val = fig.data[0].values[i]
             new_labels.append(f"<b>{label}</b><br>{val}%")
@@ -79,22 +84,27 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE (Integrated Filtering) ---
+# --- 5. SYSTEM MASTER TABLE (With Integrated Filter & Editing) ---
 st.subheader("System Master Table")
-st.caption("Use the column headers to filter, sort, and search across your entire system.")
 
-# Professional column configuration
-# We no longer need the 'horizon' filter because st.data_editor allows users to filter/sort 
-# by clicking column headers in the UI.
+# Integrated Timeframe Filter
+time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
+filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
+
+if filter_choice == "All":
+    display_df = df
+else:
+    display_df = df[df["Timeframe"] == filter_choice]
+
 edited_df = st.data_editor(
-    df,
+    display_df,
     num_rows="dynamic",
     use_container_width=True,
     key="master_blueprint_editor",
     column_config={
-        "Progress": st.column_config.ProgressColumn(
-            "Completion",
-            help="Current completion status",
+        "Progress": st.column_config.NumberColumn(
+            "Progress %",
+            help="Double-click to edit completion percentage",
             format="%d%%",
             min_value=0,
             max_value=100,
@@ -106,15 +116,20 @@ edited_df = st.data_editor(
             options=["High", "Medium", "Low"]
         ),
         "Timeframe": st.column_config.SelectboxColumn(
-            "Horizon",
             options=["This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
         )
     }
 )
 
 if st.button("Synchronize System Blueprint", use_container_width=True):
+    # If filtering is on, we update the main DF with edited changes before saving
+    if filter_choice != "All":
+        df.update(edited_df)
+    else:
+        df = edited_df
+
     execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
-    for _, row in edited_df.iterrows():
+    for _, row in df.iterrows():
         if row["Description"]:
             execute_query(
                 "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
