@@ -39,7 +39,8 @@ with st.expander("➕ Add New Event"):
     e_desc = st.text_input("Event Name")
     if st.button("Save Event", use_container_width=True):
         if e_desc:
-            execute_query("INSERT INTO events (user_email, event_date, description) VALUES (%s, %s, %s)", (user, e_date, e_desc))
+            execute_query("INSERT INTO events (user_email, event_date, description, is_done) VALUES (%s, %s, %s, %s)", 
+                          (user, e_date, e_desc, False))
             st.rerun()
 
 # --- 6. CALENDAR GRID ---
@@ -60,19 +61,17 @@ for week in cal_matrix:
                 with st.container(border=True):
                     st.markdown(f"<p style='margin-bottom:5px;'><strong>{day}</strong></p>", unsafe_allow_html=True)
                     
-                    # 2. OVERFLOW DIV: This prevents the box from growing
-                    st.markdown('<div style="height:100px; overflow-y:auto; overflow-x:hidden;">', unsafe_allow_html=True)
+                    # 2. GROWTH FIX: This prevents the day box from expanding vertically
+                    st.markdown('<div style="height:110px; overflow-y:auto; overflow-x:hidden;">', unsafe_allow_html=True)
                     
                     cur_date = f"{year}-{month_num:02d}-{day:02d}"
                     events = fetch_query("SELECT id, description, is_done FROM events WHERE user_email=%s AND event_date=%s", (user, cur_date))
                     
                     for eid, desc, is_done in events:
-                        # 3. ALIGNMENT FIX: Vertical alignment is set by the column padding
-                        # Ratio [0.6, 0.2, 0.2] gives buttons enough room to be centered
+                        # 3. CENTERING FIX: Using tighter ratios for buttons
                         ec1, ec2, ec3 = st.columns([0.6, 0.2, 0.2])
                         
                         with ec1:
-                            # Event Badge
                             bg = "rgba(118, 179, 114, 0.2)" if is_done else "rgba(255, 75, 75, 0.1)"
                             txt_c = "#76b372" if is_done else "#ff4b4b"
                             st.markdown(f"""<div style='background:{bg}; color:{txt_c}; padding:2px 5px; 
@@ -82,7 +81,6 @@ for week in cal_matrix:
                                          {desc}</div>""", unsafe_allow_html=True)
                         
                         with ec2:
-                            # PERFECT CENTERING: use_container_width + custom height
                             if st.button("✔", key=f"done_{eid}", use_container_width=True):
                                 execute_query("UPDATE events SET is_done=True WHERE id=%s", (eid,))
                                 st.rerun()
