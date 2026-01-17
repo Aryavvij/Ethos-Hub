@@ -18,14 +18,15 @@ st.markdown("""
     div[data-testid="stHorizontalBlock"] {
         gap: 4px !important;
     }
-    /* Ensures the button height matches our custom text box exactly */
+    /* Ensures the button height and width are locked to a square-ish shape to match the text box */
     .stButton > button {
         height: 35px !important;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
+        width: 100% !important;
+        padding: 0px !important;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 14px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -76,9 +77,9 @@ for i, day_name in enumerate(days):
         tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
                             (user, i, start_date))
         
-        # --- TASK LIST RENDERING: TRIPLE EQUAL-SIZED BLOCKS ---
+        # --- TASK LIST RENDERING: IDENTICAL TRIPLE BLOCKS ---
         for tid, tname, tdone in tasks:
-            # 0.2 / 0.6 / 0.2 creates a symmetrical look where icons frame the text
+            # 0.2 / 0.6 / 0.2 ratio creates a symmetrical look (1:3:1)
             c1, c2, c3 = st.columns([0.2, 0.6, 0.2])
             
             with c1:
@@ -91,7 +92,7 @@ for i, day_name in enumerate(days):
                 status_color = "#76b372" if tdone else "#ff4b4b"
                 bg_opacity = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
                 
-                # Text Box (Height 35px, matched to buttons)
+                # Text Box (Height 35px, width 100% to fill the 0.6 column)
                 st.markdown(f"""
                     <div style="background:{bg_opacity}; color:{status_color}; border: 1px solid {status_color}; 
                     border-radius: 4px; text-align: center; font-weight: bold; font-size: 10px; 
