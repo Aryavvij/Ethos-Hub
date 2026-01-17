@@ -56,7 +56,6 @@ for i, day_name in enumerate(days):
             
             with t_col:
                 # Task Button (Acts as a status toggle)
-                style = "✅ " if tdone else "⭕ "
                 if st.button(f"{style}{tname}", key=f"chk_{tid}", use_container_width=True):
                     execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
                     st.rerun()
