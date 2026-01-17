@@ -53,32 +53,34 @@ for i, day_name in enumerate(days):
         
         # Task List Rendering
         for tid, tname, tdone in tasks:
-            # 3-Column Layout: Status Toggle, Task Text, Delete
-            # Ratios [0.15, 0.7, 0.15] ensure icons are small and text is centered
+            # 3-Column Layout: Perfect alignment using specific ratios
+            # c1: Check (10%), c2: Task Text (70%), c3: Delete (20%)
             c1, c2, c3 = st.columns([0.15, 0.7, 0.15])
             
             with c1:
-                # Green Tick for Done
-                if st.button("✔", key=f"done_{tid}", help="Mark as Done"):
+                # Tick Button
+                if st.button("✔", key=f"done_{tid}", help="Mark as Done", use_container_width=True):
                     execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
                     st.rerun()
             
             with c2:
-                # Dynamic Style based on status
-                bg = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
-                txt = "#76b372" if tdone else "#ff4b4b"
-                label = "DONE" if tdone else "PENDING"
+                # Status-based styling
+                status_color = "#76b372" if tdone else "#ff4b4b"
+                bg_opacity = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
                 
+                # Fixed height to align perfectly with Streamlit's default button height
                 st.markdown(f"""
-                    <div style="background:{bg}; color:{txt}; padding:4px; border-radius:4px; 
-                    font-size:11px; text-align:center; border: 1px solid {txt}; 
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 30px; line-height: 20px;">
+                    <div style="background:{bg_opacity}; color:{status_color}; 
+                    border: 1px solid {status_color}; border-radius: 4px; padding: 5px; 
+                    text-align: center; font-weight: bold; font-size: 11px; 
+                    height: 35px; line-height: 25px; white-space: nowrap; 
+                    overflow: hidden; text-overflow: ellipsis;">
                         {tname.upper()}
                     </div>
                 """, unsafe_allow_html=True)
             
             with c3:
-                # Red Cross for Delete / Mark Not Done
-                if st.button("✖", key=f"del_{tid}", help="Delete Task"):
+                # Cross Button
+                if st.button("✖", key=f"del_{tid}", help="Delete Task", use_container_width=True):
                     execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                     st.rerun()
