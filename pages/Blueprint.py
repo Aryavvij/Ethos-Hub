@@ -34,16 +34,11 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. THE STRATEGY BRIDGE (Centered Sunburst with Global Averages) ---
+# --- 4. THE STRATEGY BRIDGE (Sunburst Map) ---
 st.subheader("Strategic Resource Mapping")
 chart_data = df[df['Progress'] > 0].copy()
 
 if not chart_data.empty:
-    # GLOBAL AVERAGES CALCULATION
-    # This ensures "Medium" shows the same avg across all categories
-    cat_averages = chart_data.groupby('Category')['Progress'].mean().to_dict()
-    prio_global_avg = chart_data.groupby('Priority')['Progress'].mean().to_dict()
-
     fig = px.sunburst(
         chart_data, 
         path=['Category', 'Priority', 'Description'], 
@@ -51,32 +46,6 @@ if not chart_data.empty:
         color='Category',
         color_discrete_sequence=px.colors.qualitative.Bold,
     )
-
-    new_labels = []
-    for i, label in enumerate(fig.data[0].labels):
-        parent = fig.data[0].parents[i]
-        
-        # 1. Category Level (Outer root)
-        if label in cat_averages and parent == "":
-            new_labels.append(f"<b>{label}</b><br>{cat_averages[label]:.1f}%")
-        
-        # 2. Priority Level (Global Average Logic)
-        elif label in ["High", "Medium", "Low"]:
-            avg = prio_global_avg.get(label, 0)
-            new_labels.append(f"<b>{label}</b><br>{avg:.1f}%")
-            
-        # 3. Task Level (Actual Progress)
-        else:
-            val = fig.data[0].values[i]
-            new_labels.append(f"<b>{label}</b><br>{val}%")
-
-    fig.update_traces(
-        textinfo="text", text=new_labels,
-        marker_line_width=3, marker_line_color="#121212",
-        hovertemplate='<b>%{label}</b><extra></extra>',
-        insidetextorientation='radial'
-    )
-
     fig.update_layout(margin=dict(t=10, l=10, r=10, b=10), height=550, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
 else:
@@ -84,56 +53,53 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE (Integrated Filtering & Editing) ---
+# --- 5. SYSTEM MASTER TABLE (Dual Progress Update) ---
 st.subheader("System Master Table")
 
-# Timeframe Filter logic
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
 filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
 
-if filter_choice == "All":
-    display_df = df
-else:
-    display_df = df[df["Timeframe"] == filter_choice]
+# Create a 'Visual' column for the bar display
+df['Visual Progress'] = df['Progress']
 
-# COLUMN CONFIGURATION
-# We use NumberColumn so you can double-click and type the % manually
+display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
+
+# COLUMN CONFIGURATION: Visual Bar + Editable Number
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
     key="master_blueprint_editor",
     column_config={
+        "Visual Progress": st.column_config.ProgressColumn(
+            "Status",
+            help="Visual progress line",
+            format="%d%%",
+            min_value=0,
+            max_value=100,
+        ),
         "Progress": st.column_config.NumberColumn(
-            "Progress %",
-            help="Double-click to set completion (0-100)",
-            format="%d%%", # This keeps the % symbol visible
+            "Edit %",
+            help="Double-click to set progress (0-100)",
+            format="%d%%",
             min_value=0,
             max_value=100,
             step=1,
         ),
-        "Category": st.column_config.SelectboxColumn(
-            options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]
-        ),
-        "Priority": st.column_config.SelectboxColumn(
-            options=["High", "Medium", "Low"]
-        ),
-        "Timeframe": st.column_config.SelectboxColumn(
-            options=["This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
-        )
+        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
+        "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
+        "Timeframe": st.column_config.SelectboxColumn(options=time_options[1:])
     }
 )
 
 if st.button("Synchronize System Blueprint", use_container_width=True):
-    # Update main dataframe with edited results before saving
-    if filter_choice != "All":
-        df.update(edited_df)
-    else:
-        df = edited_df
-
+    # Process updates
     execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
-    for _, row in df.iterrows():
+    
+    # We loop through the edited_df to save changes
+    for _, row in edited_df.iterrows():
         if row["Description"]:
+            # Cleanly handle row updates
             execute_query(
                 "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
                 (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], int(row["Progress"]))
