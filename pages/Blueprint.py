@@ -33,38 +33,55 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. THE STRATEGY BRIDGE (PERCENTAGES ON ALL RINGS) ---
+# --- 4. THE STRATEGY BRIDGE (FIXED: ALL RINGS SHOW AVG %) ---
 st.subheader("Strategic Resource Mapping")
 if not df.empty:
     chart_df = df.copy()
     
-    # Calculate averages for all levels to show percentages on every ring
-    cat_avg = chart_df.groupby('Category')['Progress'].mean().reset_index()
+    # 1. Calculate Averages for the Rings
+    cat_avg = chart_df.groupby('Category')['Progress'].mean().to_dict()
+    # Calculate Priority average within each category
     prio_avg = chart_df.groupby(['Category', 'Priority'])['Progress'].mean().reset_index()
     
-    # Constructing a custom display label for the sunburst logic
-    # This ensures that even the inner rings (Category/Priority) display their average %
-    chart_df['Display_Label'] = chart_df['Description'].str.upper() + "<br>" + chart_df['Progress'].astype(str) + "%"
-    
+    # 2. Build the path labels manually to force percentages onto inner rings
+    # We use plotly's ability to handle hierarchical labels
     fig = px.sunburst(
         chart_df, 
-        path=['Category', 'Priority', 'Display_Label'], 
+        path=['Category', 'Priority', 'Description'], 
         values='Progress', 
         color='Category', 
         color_discrete_sequence=px.colors.qualitative.Bold
     )
-    
-    # Restoration of Bold separation lines and multi-level percentage visibility
+
+    # 3. Logic to update the labels on EVERY ring
+    new_labels = []
+    for i, label in enumerate(fig.data[0].labels):
+        parent = fig.data[0].parents[i]
+        
+        # If it's a Category (Root level)
+        if label in cat_avg and parent == "":
+            new_labels.append(f"<b>{label.upper()}</b><br>{int(cat_avg[label])}%")
+        
+        # If it's a Priority (Middle level)
+        elif label in ["High", "Medium", "Low"]:
+            # Find the specific average for this priority under its specific category parent
+            val = prio_avg[(prio_avg['Priority'] == label) & (prio_avg['Category'] == parent)]['Progress']
+            avg_val = int(val.values[0]) if not val.empty else 0
+            new_labels.append(f"<b>{label}</b><br>{avg_val}%")
+            
+        # If it's a Task (Outer level)
+        else:
+            # Get the progress value for this specific leaf
+            val = fig.data[0].values[i]
+            new_labels.append(f"<b>{label.upper()}</b><br>{int(val)}%")
+
     fig.update_traces(
+        textinfo="text",
+        text=new_labels,
         marker_line_width=3, 
         marker_line_color="#121212", 
-        insidetextorientation='radial',
-        textinfo="label" # This utilizes the labels we've constructed for the leaves
+        insidetextorientation='radial'
     )
-    
-    # Customizing the text for the inner rings (Categories and Priorities)
-    # This logic ensures that the % is visible on all rings, not just the outer one
-    fig.data[0].text = [f"<b>{label}</b>" for label in fig.data[0].labels]
     
     fig.update_layout(margin=dict(t=10, l=10, r=10, b=10), height=550, paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
@@ -73,36 +90,28 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE (CLEAN PROGRESS BAR) ---
+# --- 5. SYSTEM MASTER TABLE (CLEAN: ONE PROGRESS COLUMN) ---
 st.subheader("System Master Table")
 
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
 filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
 
-# Mirror progress value for the visual bar
-df['Progress Bar'] = df['Progress']
-
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
-# COLUMN CONFIGURATION: Number input for data + Pure visual bar
+# COLUMN CONFIGURATION: Only one editable column for progress
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
-    key="blueprint_editor_final_v3",
+    key="blueprint_final_locked",
     column_config={
         "Progress": st.column_config.NumberColumn(
-            "Enter %",
+            "Manual %",
+            help="Type your progress (0-100). The chart will update on sync.",
             min_value=0,
             max_value=100,
             step=1,
             format="%d%%"
-        ),
-        "Progress Bar": st.column_config.ProgressColumn(
-            "Visual Status",
-            min_value=0,
-            max_value=100,
-            format="" # CRITICAL: This removes the number from inside/next to the bar
         ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
