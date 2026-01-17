@@ -17,6 +17,22 @@ raw_data = fetch_query("SELECT task_description, category, timeframe, priority, 
 df = pd.DataFrame(raw_data, columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
 df['Status Bar'] = df['Progress']
 
+# --- 3. TOP LEVEL OVERVIEW (Metrics) ---
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    st.metric("Total Initiatives", len(df))
+with m2:
+    high_prio = len(df[df["Priority"].str.contains("High", na=False)]) if not df.empty else 0
+    st.metric("High Priority", high_prio)
+with m3:
+    avg_prog = int(df["Progress"].mean()) if not df.empty else 0
+    st.metric("Avg. Completion", f"{avg_prog}%")
+with m4:
+    ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
+    st.metric("Ready to Deploy", ready)
+
+st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+
 # STRATEGY MAP
 st.subheader("Strategic Resource Mapping")
 if not df.empty:
