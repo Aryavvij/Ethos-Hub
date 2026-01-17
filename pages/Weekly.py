@@ -5,16 +5,27 @@ from database import execute_query, fetch_query
 # 1. SET WIDE MODE
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 
-# CSS HACK: Force column centering and remove excessive padding to prevent "poking out"
+# CSS HACK: Global alignment and gap control
 st.markdown("""
     <style>
+    /* Centers all items vertically in the column */
     [data-testid="column"] {
         display: flex;
         align-items: center;
         justify-content: center;
     }
+    /* Reduces the gap between the 3 boxes for a tighter look */
     div[data-testid="stHorizontalBlock"] {
-        gap: 2px !important;
+        gap: 4px !important;
+    }
+    /* Ensures the button height matches our custom text box exactly */
+    .stButton > button {
+        height: 35px !important;
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -47,11 +58,11 @@ cols = st.columns(7)
 for i, day_name in enumerate(days):
     this_date = start_date + timedelta(days=i)
     with cols[i]:
-        # Big Styled Header
+        # Day Header
         st.markdown(f"""<div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; margin-bottom: 10px; width:100%;">
             <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small></div>""", unsafe_allow_html=True)
         
-        # Input Section
+        # New Task Input
         new_task = st.text_input("Task", key=f"in_{i}", label_visibility="collapsed", placeholder="+ New Task")
         if st.button("Add Task", key=f"btn_{i}", use_container_width=True):
             if new_task:
@@ -61,17 +72,17 @@ for i, day_name in enumerate(days):
         
         st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
         
-        # Pull tasks from database
+        # Fetch Data
         tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
                             (user, i, start_date))
         
-        # --- TASK LIST RENDERING: THE PERFECT ALIGNMENT FIX ---
+        # --- TASK LIST RENDERING: TRIPLE EQUAL-SIZED BLOCKS ---
         for tid, tname, tdone in tasks:
-            # 18% / 64% / 18% ratio creates perfect centering in a tight 7-column grid
-            c1, c2, c3 = st.columns([0.18, 0.64, 0.18])
+            # 0.2 / 0.6 / 0.2 creates a symmetrical look where icons frame the text
+            c1, c2, c3 = st.columns([0.2, 0.6, 0.2])
             
             with c1:
-                # Icon centered in slot
+                # Tick Button (Height 35px via CSS)
                 if st.button("✔", key=f"done_{tid}", use_container_width=True):
                     execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
                     st.rerun()
@@ -80,18 +91,18 @@ for i, day_name in enumerate(days):
                 status_color = "#76b372" if tdone else "#ff4b4b"
                 bg_opacity = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
                 
-                # Fixed height (35px) and line-height (33px) centers text vertically
+                # Text Box (Height 35px, matched to buttons)
                 st.markdown(f"""
                     <div style="background:{bg_opacity}; color:{status_color}; border: 1px solid {status_color}; 
-                    border-radius: 4px; text-align: center; font-weight: bold; font-size: 9px; 
-                    height: 35px; line-height: 33px; width: 100%; white-space: nowrap; 
-                    overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: center; align-items: center;">
+                    border-radius: 4px; text-align: center; font-weight: bold; font-size: 10px; 
+                    height: 35px; line-height: 35px; width: 100%; white-space: nowrap; 
+                    overflow: hidden; text-overflow: ellipsis;">
                         {tname.upper()}
                     </div>
                 """, unsafe_allow_html=True)
             
             with c3:
-                # Icon centered in slot
+                # Cross Button (Height 35px via CSS)
                 if st.button("✖", key=f"del_{tid}", use_container_width=True):
                     execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                     st.rerun()
