@@ -27,60 +27,83 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 3. DATA ENGINE ---
-raw_habits = fetch_query(
-    "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
+# --- 3. DATA ENGINE (DYNAMIC) ---
+# Fetch unique habit names first to build the index
+existing_habits_raw = fetch_query(
+    "SELECT DISTINCT habit_name FROM habits WHERE user_email=%s AND month=%s AND year=%s",
     (user, month_num, year)
 )
-
-habit_list = [
+# Fallback to your default list if the database is empty for this month
+default_habits = [
     "Brushing Morning", "Book Reading", "Coursera Video", "7 Hour Sleep", 
     "Minimum Sugar", "Protein Goal", "Brushing Night", "Gym/Training", 
     "Teeth Gel", "Attended Classes", "Bath", "Jogging"
 ]
+current_habit_names = [h[0] for h in existing_habits_raw] if existing_habits_raw else default_habits
 
 # Build the main grid
-df = pd.DataFrame(index=habit_list, columns=day_cols).fillna(False)
-for h_name, h_day, h_status in raw_habits:
+df = pd.DataFrame(index=current_habit_names, columns=day_cols).fillna(False)
+
+# Populate the grid with status
+raw_data = fetch_query(
+    "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
+    (user, month_num, year)
+)
+for h_name, h_day, h_status in raw_data:
     if h_name in df.index and str(h_day) in df.columns:
         df.at[h_name, str(h_day)] = bool(h_status)
 
-# --- 4. MAIN EDITOR ---
+# Rename index to "Habit Name" for the editor
+df.index.name = "Habit Name"
+
+# --- 4. MAIN EDITOR (DYNAMIC ROWS ENABLED) ---
 with st.container(border=True):
     st.subheader(f"🗓️ {month_name} Habit Grid")
-    edited_df = st.data_editor(df, use_container_width=True, height=400, key="habit_editor_v5")
+    st.caption("Double click the bottom row to add a new habit. Select a row and press Delete to remove it.")
+    
+    # FIX: Resetting index so 'Habit Name' becomes an editable column for dynamic rows
+    edited_df = st.data_editor(
+        df.reset_index(), 
+        use_container_width=True, 
+        height=450, 
+        num_rows="dynamic", # THIS ENABLES ADD/DELETE
+        key="habit_editor_v6"
+    )
 
     if st.button("💾 Synchronize Habit Lab", use_container_width=True):
+        # Clear existing for the month to sync perfectly
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
-        for habit, row in edited_df.iterrows():
-            for day_str, status in row.items():
-                if status:
-                    # FIX: We pass Python 'True' which SQL recognizes as BOOLEAN
-                    execute_query(
-                        "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
-                        (user, habit, month_num, year, int(day_str), True)
-                    )
+        
+        for _, row in edited_df.iterrows():
+            h_name = row["Habit Name"]
+            if pd.notna(h_name) and h_name.strip() != "":
+                for day_str in day_cols:
+                    status = row[day_str]
+                    if status:
+                        execute_query(
+                            "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
+                            (user, h_name.strip(), month_num, year, int(day_str), True)
+                        )
         st.success("Consistency Synced.")
         st.rerun()
 
 st.markdown("---")
 
-# --- 5. PERFORMANCE STATISTICS TABLE (Horizontal 3-Row Table) ---
-daily_done = edited_df.sum(axis=0).astype(int)
-total_possible = len(habit_list)
-daily_progress = ((daily_done / total_possible) * 100).round(0).astype(int)
-daily_not_done = total_possible - daily_done
+# --- 5. PERFORMANCE STATISTICS ---
+# We use the edited_df but need to set the index back to calculate stats properly
+stats_base = edited_df.set_index("Habit Name")
+daily_done = stats_base.sum(axis=0).astype(int)
+total_possible = len(stats_base)
+daily_progress = ((daily_done / total_possible) * 100).round(0).astype(int) if total_possible > 0 else daily_done * 0
 
-# Creating the horizontal 3-row table
 stats_df = pd.DataFrame({
     "Progress": [f"{p}%" for p in daily_progress],
     "Done": daily_done,
-    "Not Done": daily_not_done
+    "Not Done": total_possible - daily_done
 }).T
 stats_df.columns = day_cols
 
 st.subheader("📊 Daily Performance Summary")
-# Displaying as a non-editable dataframe for a professional look
 st.dataframe(stats_df, use_container_width=True)
 
 # --- 6. VISUAL MOMENTUM CHART ---
@@ -99,7 +122,7 @@ fig = px.area(
 )
 
 fig.update_layout(
-    yaxis=dict(title="Habits Done", range=[0, total_possible + 1], gridcolor="rgba(255,255,255,0.05)"),
+    yaxis=dict(title="Habits Done", range=[0, max(total_possible + 1, 5)], gridcolor="rgba(255,255,255,0.05)"),
     xaxis=dict(title="Day of Month", tickmode='linear', dtick=5, gridcolor="rgba(255,255,255,0.05)"),
     height=350,
     margin=dict(l=0, r=0, t=20, b=0),
