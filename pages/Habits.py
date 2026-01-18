@@ -15,7 +15,11 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 user = st.session_state.user_email
 st.title("📈 Habit Lab")
 
-# --- 2. DATE SELECTORS ---
+# --- 2. VERSION CONTROL (FORCES UI TO KILL PHANTOM ROWS) ---
+if 'habit_version' not in st.session_state:
+    st.session_state.habit_version = 0
+
+# --- 3. DATE SELECTORS ---
 col_m, col_y = st.columns(2)
 with col_m:
     month_name = st.selectbox("Month", list(calendar.month_name)[1:], index=datetime.now().month-1)
@@ -26,23 +30,17 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 3. WIDGET STATE RESETTER (The Ghost Row Killer) ---
-if 'habit_sync_version' not in st.session_state:
-    st.session_state.habit_sync_version = 0
-
-# --- 4. DATA ENGINE (CLEAN & PERSISTENT) ---
+# --- 4. DATA ENGINE (STRICT ROW BUILDING) ---
 raw_data = fetch_query(
     "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
     (user, month_num, year)
 )
 
+# Pull unique habits from DB
 db_habits = sorted(list(set([row[0] for row in raw_data if row[0]])))
 
-# Fallback to your standards if DB is empty
-if not db_habits:
-    unique_habits = ["4L Water Intake", "7.5 Hour Sleep", "Attended Classes", "Book Reading", "Brushing Twice", "Coursera Video", "Gym/Training", "Minimum Sugar", "Protein Goal"]
-else:
-    unique_habits = db_habits
+# Fallback defaults if month is empty
+unique_habits = db_habits if db_habits else ["4L Water Intake", "7.5 Hour Sleep", "Attended Classes", "Book Reading", "Brushing Twice", "Coursera Video", "Gym/Training", "Minimum Sugar", "Protein Goal"]
 
 rows = []
 for h_name in unique_habits:
@@ -54,6 +52,7 @@ for h_name in unique_habits:
             row_dict[str(db_day)] = bool(db_status)
     rows.append(row_dict)
 
+# Build DF - We ensure it starts with NO extra blank rows in the data itself
 df = pd.DataFrame(rows, columns=["Habit Name"] + day_cols)
 
 # --- 5. MAIN EDITOR ---
@@ -66,20 +65,23 @@ with st.container(border=True):
     for day in day_cols:
         col_config[day] = st.column_config.CheckboxColumn(day, default=False, width="small")
 
-    # Dynamic key forces the UI to refresh and dump ghost rows on sync
-    editor_key = f"habit_editor_v{st.session_state.habit_sync_version}_{month_num}_{year}"
+    # The Key includes 'habit_version' which we increment to clear ghost rows on sync
+    editor_key = f"habit_v{st.session_state.habit_version}_{month_num}_{year}"
     
     edited_df = st.data_editor(
         df, 
         use_container_width=True, 
         height=450, 
-        num_rows="dynamic",
+        num_rows="dynamic", # Provides exactly one '+' row at the bottom
         column_config=col_config,
         key=editor_key
     )
 
     if st.button("💾 Synchronize System", use_container_width=True):
+        # 1. Clear DB
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
+        
+        # 2. Sync named rows
         for _, row in edited_df.iterrows():
             h_name = row.get("Habit Name")
             if h_name and str(h_name).strip() != "":
@@ -90,11 +92,13 @@ with st.container(border=True):
                             "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
                             (user, h_clean, month_num, year, int(day_str), True)
                         )
-        st.session_state.habit_sync_version += 1
-        st.success("Synchronized.")
+        
+        # 3. Increment version to reset the widget state and kill the 3 empty rows
+        st.session_state.habit_version += 1
+        st.success("Synchronized. Grid reset.")
         st.rerun()
 
-# --- 6. PERFORMANCE & GRAPH (RESTORED) ---
+# --- 6. PERFORMANCE & MOMENTUM (Y-AXIS FIXED) ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 
 if not valid_df.empty:
@@ -115,7 +119,7 @@ if not valid_df.empty:
     st.subheader("📊 Performance Matrix")
     st.dataframe(stats_df, use_container_width=True)
 
-    # 6b. Consistency Momentum Chart (RESTORED)
+    # 6b. Momentum Chart (Y-AXIS LOCKED TO TOTAL HABITS)
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("🌊 Consistency Momentum")
     
@@ -135,7 +139,14 @@ if not valid_df.empty:
         margin=dict(l=0, r=0, t=20, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(title="Habits Done", tickmode='linear', dtick=1, gridcolor="rgba(255,255,255,0.05)"),
+        # FIXED: Range now locks from 0 to your Total Number of Habits
+        yaxis=dict(
+            title="Habits Done", 
+            range=[0, total_habits], 
+            tickmode='linear', 
+            dtick=1, 
+            gridcolor="rgba(255,255,255,0.05)"
+        ),
         xaxis=dict(title="Day of Month", tickmode='linear', dtick=5, gridcolor="rgba(255,255,255,0.05)")
     )
 
