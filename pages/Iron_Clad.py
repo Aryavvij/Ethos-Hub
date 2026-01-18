@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import json
 from database import execute_query, fetch_query
 
 # 1. PAGE CONFIG
@@ -13,27 +14,35 @@ user = st.session_state.user_email
 st.title("🛡️ Iron Clad")
 st.caption("Strategic Training Splits")
 
-# --- 2. DYNAMIC DAY SELECTION ---
-# This gives you control to remove days you don't workout on
+# --- 2. DATA PRE-LOADER (The Persistence Fix) ---
+# Fetch all existing splits for this user
+saved_splits = fetch_query("SELECT day_name, split_title, exercises_json FROM training_splits WHERE user_email=%s", (user,))
+# Format: { 'Monday': {'title': 'Push', 'data': pd.DataFrame(...) } }
+splits_cache = {row[0]: {"title": row[1], "data": row[2]} for row in saved_splits}
+
+# --- 3. DYNAMIC DAY SELECTION ---
 st.markdown("### ⚙️ Split Configuration")
+# We default to the days already in the database if available
+existing_days = list(splits_cache.keys())
 active_days = st.multiselect(
     "Select your active training days:",
     ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    default=["Monday", "Tuesday", "Wednesday", "Friday"],
+    default=existing_days if existing_days else ["Monday", "Tuesday", "Wednesday", "Friday"],
     help="Only selected days will appear below."
 )
 
 st.markdown("---")
 
-# --- 3. DYNAMIC TRAINING BLOCKS ---
+# --- 4. DYNAMIC TRAINING BLOCKS ---
 for day in active_days:
     with st.container():
-        # Perfectly Aligned Header and Description
+        # Day Header and Title Input
         col_day, col_desc = st.columns([1, 4])
         
+        # Load existing title if it exists
+        existing_title = splits_cache.get(day, {}).get("title", "")
+        
         with col_day:
-            # FIX: Removed the red-tinted default headers.
-            # Using your strategic Green (#76b372) or a neutral dark grey.
             st.markdown(f"""
                 <div style="background:#76b372; padding:8px; border-radius:5px; 
                 text-align:center; color:white; font-weight:bold; height:41px; 
@@ -44,19 +53,25 @@ for day in active_days:
             """, unsafe_allow_html=True)
             
         with col_desc:
-            # Description box now sits flush with the green day tag
             st.text_input(
                 f"Focus for {day}", 
+                value=existing_title, # FIXED: This keeps your title visible
                 placeholder="Training Focus (e.g., Push / Legs)", 
                 key=f"title_{day}", 
                 label_visibility="collapsed"
             )
 
-
-        # Table without Intensity (RPE) column
-        base_df = pd.DataFrame(columns=["Exercise", "Weight (kg)", "Sets", "Reps"])
+        # Load existing table data if it exists
+        existing_json = splits_cache.get(day, {}).get("data", None)
+        if existing_json:
+            try:
+                base_df = pd.read_json(existing_json)
+            except:
+                base_df = pd.DataFrame(columns=["Exercise", "Weight (kg)", "Sets", "Reps"])
+        else:
+            base_df = pd.DataFrame(columns=["Exercise", "Weight (kg)", "Sets", "Reps"])
         
-        # Note: In a full implementation, you'd fetch exercise data here too
+        # Table Editor
         st.data_editor(
             base_df,
             num_rows="dynamic",
@@ -71,16 +86,27 @@ for day in active_days:
         )
         st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
 
-# --- 4. GLOBAL SYNC ---
+# --- 5. GLOBAL SYNC ---
 if st.button("🚀 Synchronize Weekly Training Plan", use_container_width=True):
-    # Save titles so they appear on the Home Page
+    # First, handle the DB cleanup (Remove days that were unselected)
+    all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    removed_days = [d for d in all_days if d not in active_days]
+    for d in removed_days:
+        execute_query("DELETE FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d))
+
+    # Save active days
     for day in active_days:
         title_to_save = st.session_state.get(f"title_{day}", "")
+        # Convert the editor's data to JSON string for storage
+        df_to_save = st.session_state.get(f"editor_{day}", pd.DataFrame())
+        json_data = df_to_save.to_json() if not df_to_save.empty else None
+        
         execute_query("""
-            INSERT INTO training_splits (user_email, day_name, split_title) 
-            VALUES (%s, %s, %s) 
+            INSERT INTO training_splits (user_email, day_name, split_title, exercises_json) 
+            VALUES (%s, %s, %s, %s) 
             ON CONFLICT (user_email, day_name) 
-            DO UPDATE SET split_title = EXCLUDED.split_title
-        """, (user, day, title_to_save))
+            DO UPDATE SET split_title = EXCLUDED.split_title, exercises_json = EXCLUDED.exercises_json
+        """, (user, day, title_to_save, json_data))
     
-    st.success("Training Split and Titles Saved Successfully.")
+    st.success("Training Protocol Synchronized.")
+    st.rerun()
