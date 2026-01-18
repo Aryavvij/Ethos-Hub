@@ -26,35 +26,38 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 3. DATA ENGINE (STRICT FILTERING) ---
+# --- 3. WIDGET STATE RESETTER ---
+# This is the "God Move" to prevent extra rows. 
+# We increment this counter to force Streamlit to throw away the old "messy" table state.
+if 'habit_sync_version' not in st.session_state:
+    st.session_state.habit_sync_version = 0
+
+# --- 4. DATA ENGINE (STRICT FILTERING) ---
 raw_data = fetch_query(
     "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
     (user, month_num, year)
 )
 
-# Identify unique habits already in DB
-unique_habits = sorted(list(set([row[0] for row in raw_data if row[0]])))
+# Pull unique habits from the DB results
+db_habits = sorted(list(set([row[0] for row in raw_data if row[0]])))
 
-# Fallback to defaults ONLY if the DB is completely empty
-if not unique_habits:
-    unique_habits = ["Coursera Video", "4L Water Intake", "Minimum Sugar", "7.5 Hour Sleep", "Attended Classes", "Book Reading", "Protein Goal", "Gym/Training", "Brushing Twice"]
+# If DB is empty, use your defaults; otherwise, ONLY use what's in the DB
+unique_habits = db_habits if db_habits else ["4L Water Intake", "7.5 Hour Sleep", "Attended Classes", "Book Reading", "Brushing Twice", "Coursera Video", "Gym/Training", "Minimum Sugar", "Protein Goal"]
 
-# Build rows: ONLY for habits that actually exist
 rows = []
 for h_name in unique_habits:
     row_dict = {"Habit Name": h_name}
     for d in day_cols:
         row_dict[d] = False
-    # Map status from DB
     for db_name, db_day, db_status in raw_data:
         if db_name == h_name:
             row_dict[str(db_day)] = bool(db_status)
     rows.append(row_dict)
 
-# Create the clean DF
+# Create the clean DF with NO extra rows
 df = pd.DataFrame(rows, columns=["Habit Name"] + day_cols)
 
-# --- 4. MAIN EDITOR ---
+# --- 5. MAIN EDITOR ---
 with st.container(border=True):
     st.subheader(f"🗓️ {month_name} Grid")
     
@@ -64,9 +67,8 @@ with st.container(border=True):
     for day in day_cols:
         col_config[day] = st.column_config.CheckboxColumn(day, default=False, width="small")
 
-    # FIX: We use a dynamic key based on month/year. 
-    # This forces Streamlit to refresh the grid and clear "ghost" rows when you change dates.
-    editor_key = f"habit_editor_{month_num}_{year}"
+    # The dynamic key (sync_version) forces the UI to clear all unsaved "phantom" rows on sync
+    editor_key = f"habit_editor_v{st.session_state.habit_sync_version}_{month_num}_{year}"
     
     edited_df = st.data_editor(
         df, 
@@ -78,23 +80,28 @@ with st.container(border=True):
     )
 
     if st.button("💾 Synchronize System", use_container_width=True):
+        # 1. Clear current month
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
         
+        # 2. Insert rows that have a name
         for _, row in edited_df.iterrows():
             h_name = row.get("Habit Name")
             if h_name and str(h_name).strip() != "":
-                h_name_clean = str(h_name).strip()
+                h_clean = str(h_name).strip()
                 for day_str in day_cols:
                     if row.get(day_str) == True:
                         execute_query(
                             "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
-                            (user, h_name_clean, month_num, year, int(day_str), True)
+                            (user, h_clean, month_num, year, int(day_str), True)
                         )
-        st.success("System Synchronized.")
+        
+        # 3. INCREMENT VERSION: This kills the ghost rows for the next render
+        st.session_state.habit_sync_version += 1
+        st.success("System Synchronized. Phantom rows cleared.")
         st.rerun()
 
-# --- 5. PERFORMANCE MATRIX ---
-# Only calculate for rows that have a name
+# --- 6. PERFORMANCE MATRIX ---
+# Strictly filter out placeholder/empty rows for the stats calculation
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 if not valid_df.empty:
     st.markdown("---")
