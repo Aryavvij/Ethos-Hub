@@ -27,82 +27,80 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 3. DATA ENGINE (PURE DYNAMIC) ---
-# Fetch every unique habit this user has for THIS specific month
+# --- 3. DATA ENGINE (FIXED ROW LOGIC) ---
 raw_data = fetch_query(
     "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
     (user, month_num, year)
 )
 
-# Identify unique habits from the database results
-unique_habits = list(set([row[0] for row in raw_data]))
+unique_habits = sorted(list(set([row[0] for row in raw_data])))
 
-# Build the DataFrame frame first
-# We start with "Habit Name" as a column, not an index, to support dynamic row adding
+# We build a list of dictionaries first to prevent "Row Multiplication"
+rows = []
 if not unique_habits:
-    # If brand new month, start with one empty row to show checkboxes exist
-    df = pd.DataFrame(columns=["Habit Name"] + day_cols)
+    # JUST ONE empty row for fresh start
     new_row = {col: False for col in day_cols}
     new_row["Habit Name"] = ""
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    rows.append(new_row)
 else:
-    df = pd.DataFrame(columns=["Habit Name"] + day_cols)
     for h_name in unique_habits:
-        # Initialize row with False
         row_dict = {str(d): False for d in range(1, days_in_month + 1)}
         row_dict["Habit Name"] = h_name
-        # Fill in existing True statuses
+        # Fill existing completions
         for db_name, db_day, db_status in raw_data:
             if db_name == h_name:
                 row_dict[str(db_day)] = bool(db_status)
-        df = pd.concat([df, pd.DataFrame([row_dict])], ignore_index=True)
+        rows.append(row_dict)
+
+df = pd.DataFrame(rows)
 
 # --- 4. MAIN EDITOR ---
 with st.container(border=True):
     st.subheader(f"🗓️ {month_name} Grid")
     
-    # We define the column configuration to force checkboxes on ALL numeric day columns
+    # Configure Columns to force Checkboxes for all days
     col_config = {
-        "Habit Name": st.column_config.TextColumn("Habit Name", required=True),
+        "Habit Name": st.column_config.TextColumn("Habit Name", required=True, width="medium"),
     }
     for day in day_cols:
-        col_config[day] = st.column_config.CheckboxColumn(day, default=False)
+        col_config[day] = st.column_config.CheckboxColumn(day, default=False, width="small")
 
+    # num_rows="dynamic" adds the empty row at bottom automatically
     edited_df = st.data_editor(
         df, 
         use_container_width=True, 
-        height=500, 
-        num_rows="dynamic", # Users can add/delete
+        height=450, 
+        num_rows="dynamic",
         column_config=col_config,
-        key="habit_editor_dynamic_v7"
+        key="habit_editor_v8"
     )
 
     if st.button("💾 Synchronize System", use_container_width=True):
-        # 1. Wipe current month for this user
+        # 1. Clear current month
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
         
-        # 2. Re-insert only rows that have a Habit Name
+        # 2. Insert rows that have names
         for _, row in edited_df.iterrows():
             h_name = row["Habit Name"]
             if h_name and str(h_name).strip() != "":
                 for day_str in day_cols:
-                    if row[day_str] == True:
+                    if row.get(day_str) == True:
                         execute_query(
                             "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
                             (user, h_name.strip(), month_num, year, int(day_str), True)
                         )
-        st.success("Consistency Locked.")
+        st.success("Habit data locked.")
         st.rerun()
 
 st.markdown("---")
 
 # --- 5. PERFORMANCE SUMMARY ---
-# Calculate stats only if habits exist
-if not edited_df.empty and edited_df["Habit Name"].iloc[0] != "":
-    stats_base = edited_df.dropna(subset=["Habit Name"])
-    total_habits = len(stats_base)
-    
-    daily_done = stats_base[day_cols].sum(axis=0).astype(int)
+# Ensure we don't calculate stats on empty/placeholder rows
+valid_df = edited_df[edited_df["Habit Name"].str.strip() != ""]
+
+if not valid_df.empty:
+    total_habits = len(valid_df)
+    daily_done = valid_df[day_cols].sum(axis=0).astype(int)
     daily_progress = ((daily_done / total_habits) * 100).round(1)
 
     stats_df = pd.DataFrame({
@@ -121,5 +119,6 @@ if not edited_df.empty and edited_df["Habit Name"].iloc[0] != "":
         "Completed": daily_done.values
     })
     fig = px.area(chart_data, x="Day", y="Completed", color_discrete_sequence=['#76b372'], template="plotly_dark")
-    fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+                      yaxis=dict(title="Habits Done", tickmode='linear', dtick=1))
     st.plotly_chart(fig, use_container_width=True)
