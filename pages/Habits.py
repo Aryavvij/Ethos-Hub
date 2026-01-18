@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from database import execute_query, fetch_query
@@ -15,7 +15,8 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 user = st.session_state.user_email
 st.title("📈 Habit Lab")
 
-# --- 2. VERSION CONTROL (FORCES UI TO KILL PHANTOM ROWS) ---
+# --- 2. THE HARD RESET LOGIC ---
+# This ensures that browser-cached "ghost rows" are deleted on every sync
 if 'habit_version' not in st.session_state:
     st.session_state.habit_version = 0
 
@@ -30,24 +31,23 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 4. DATA ENGINE (NO DEFAULTS - STRICTLY USER DATA) ---
+# --- 4. DATA ENGINE (STRICT USER-ONLY DATA) ---
 raw_data = fetch_query(
     "SELECT habit_name, day, status FROM habits WHERE user_email=%s AND month=%s AND year=%s",
     (user, month_num, year)
 )
 
-# Pull unique habits from DB
+# Only pull habits that actually exist in the database
 db_habits = sorted(list(set([row[0] for row in raw_data if row[0]])))
 
 rows = []
+# If DB is empty, we start with EXACTLY ONE empty dictionary
 if not db_habits:
-    # If brand new: ONLY ONE single empty row.
     new_row = {"Habit Name": ""}
     for d in day_cols:
         new_row[d] = False
     rows.append(new_row)
 else:
-    # If data exists: Load only what is in the DB
     for h_name in db_habits:
         row_dict = {"Habit Name": h_name}
         for d in day_cols:
@@ -69,21 +69,24 @@ with st.container(border=True):
     for day in day_cols:
         col_config[day] = st.column_config.CheckboxColumn(day, default=False, width="small")
 
-    # Key rotation resets the widget to kill browser-cached extra rows
+    # KEY ROTATION: The 'habit_version' forces the browser to destroy the old 
+    # table and its "phantom rows" whenever you sync or change months.
     editor_key = f"habit_v{st.session_state.habit_version}_{month_num}_{year}"
     
     edited_df = st.data_editor(
         df, 
         use_container_width=True, 
-        height=450, 
+        height=400, 
         num_rows="dynamic",
         column_config=col_config,
         key=editor_key
     )
 
     if st.button("💾 Synchronize System", use_container_width=True):
+        # 1. Wipe DB for this month
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
         
+        # 2. Save only rows where the user actually typed a name
         for _, row in edited_df.iterrows():
             h_name = row.get("Habit Name")
             if h_name and str(h_name).strip() != "":
@@ -95,12 +98,12 @@ with st.container(border=True):
                             (user, h_clean, month_num, year, int(day_str), True)
                         )
         
+        # 3. Kill phantom rows by updating version
         st.session_state.habit_version += 1
         st.success("System Synchronized.")
         st.rerun()
 
-# --- 6. PERFORMANCE & MOMENTUM ---
-# Filter out the placeholder row for chart/stats
+# --- 6. PERFORMANCE & MOMENTUM (CHART CEILING FIX) ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 
 if not valid_df.empty:
@@ -110,7 +113,7 @@ if not valid_df.empty:
     daily_done = valid_df[day_cols].sum(axis=0).astype(int)
     daily_progress = ((daily_done / total_habits_count) * 100).round(1)
 
-    # Performance Matrix
+    # 6a. Performance Matrix
     stats_df = pd.DataFrame({
         "Progress": [f"{p}%" for p in daily_progress],
         "Done": daily_done.values,
@@ -121,7 +124,7 @@ if not valid_df.empty:
     st.subheader("📊 Performance Matrix")
     st.dataframe(stats_df, use_container_width=True)
 
-    # Momentum Chart
+    # 6b. Momentum Chart (Y-AXIS RANGE FIX)
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("🌊 Consistency Momentum")
     
@@ -136,15 +139,16 @@ if not valid_df.empty:
         template="plotly_dark"
     )
 
+    # FIXED: The Y-axis range now explicitly starts at 0 and ends EXACTLY at your total habits.
+    # We add a small .2 buffer so the top line (9) is clearly visible.
     fig.update_layout(
-        height=350,
+        height=400,
         margin=dict(l=0, r=0, t=20, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        # SCALE FIXED: Top of graph is now exactly the number of habits in your list
         yaxis=dict(
             title="Habits Done", 
-            range=[0, total_habits_count], 
+            range=[0, total_habits_count + 0.2], 
             tickmode='linear', 
             dtick=1, 
             gridcolor="rgba(255,255,255,0.05)"
