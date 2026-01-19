@@ -6,7 +6,6 @@ from database import execute_query, fetch_query
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 
 # --- CSS HEIGHT & SYMMETRY LOCK ---
-# This ensures buttons and text boxes are identical in size and perfectly centered
 st.markdown("""
     <style>
     /* Centers all items vertically in the column */
@@ -15,21 +14,20 @@ st.markdown("""
         align-items: center;
         justify-content: center;
     }
-    /* Reduces the horizontal gap between the 3 boxes */
+    /* Reduces the horizontal gap between elements */
     div[data-testid="stHorizontalBlock"] {
-        gap: 4px !important;
+        gap: 6px !important;
     }
-    /* Lock Button Height to exactly 35px to match the text box */
-    .stButton > button {
+    /* Standardize height for all interactive elements */
+    .stCheckbox, .stButton, div[data-testid="stMarkdownContainer"] {
         height: 35px !important;
-        min-height: 35px !important;
-        max-height: 35px !important;
-        padding: 0px !important;
         display: flex;
         align-items: center;
+    }
+    /* Align checkbox to the center of its 30% slot */
+    .stCheckbox {
         justify-content: center;
-        border-radius: 4px !important;
-        font-size: 14px !important;
+        margin-top: -15px; /* Offset for Streamlit's default label padding */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -80,33 +78,38 @@ for i, day_name in enumerate(days):
         tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
                             (user, i, start_date))
         
-        # --- TASK LIST RENDERING: IDENTICAL TRIPLE BLOCKS ---
+        # --- TASK LIST RENDERING: 70:30 SPLIT ---
         for tid, tname, tdone in tasks:
-            # 1:3:1 Split ratio (0.2, 0.6, 0.2)
-            c1, c2, c3 = st.columns([0.2, 0.6, 0.2])
+            # c_left (70%) for the Task Box | c_right (30%) for the Checkbox
+            c_left, c_right = st.columns([0.7, 0.3])
             
-            with c1:
-                # Tick Button (Height 35px via CSS)
-                if st.button("✔", key=f"done_{tid}", use_container_width=True):
-                    execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
-                    st.rerun()
-            
-            with c2:
+            with c_left:
                 status_color = "#76b372" if tdone else "#ff4b4b"
                 bg_opacity = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
                 
-                # Custom Markdown Box (Height matched exactly to 35px)
+                # Task Description Box
                 st.markdown(f"""
                     <div style="background:{bg_opacity}; color:{status_color}; border: 1px solid {status_color}; 
                     border-radius: 4px; text-align: center; font-weight: bold; font-size: 10px; 
                     height: 35px; line-height: 33px; width: 100%; white-space: nowrap; 
-                    overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;">
+                    padding: 0 5px; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;">
                         {tname.upper()}
                     </div>
                 """, unsafe_allow_html=True)
             
-            with c3:
-                # Cross Button (Height 35px via CSS)
-                if st.button("✖", key=f"del_{tid}", use_container_width=True):
-                    execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
-                    st.rerun()
+            with c_right:
+                # The single status checkbox
+                if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
+                    if not tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
+                        st.rerun()
+                else:
+                    if tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
+                        st.rerun()
+
+        # Add a "Clear Day" option at bottom of each column for maintenance
+        if tasks:
+            if st.button("🗑️", key=f"clr_{i}", help=f"Clear {day_name}"):
+                execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, i, start_date))
+                st.rerun()
