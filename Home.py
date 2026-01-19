@@ -82,7 +82,7 @@ if st.button("Update Goals", use_container_width=True):
 
 st.markdown("---")
 
-# --- 2. THE 4-BOX INTEGRATED COMMAND CENTER ---
+# --- 2. THE 3-BOX INTEGRATED COMMAND CENTER ---
 st.markdown("### ⚡ Today's System Briefing")
 
 t_date = datetime.now().date()
@@ -90,7 +90,8 @@ d_name = t_date.strftime("%A")
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
-b1, b2, b3, b4 = st.columns(4)
+# Refactored to 3 columns
+b1, b2, b3 = st.columns(3)
 
 # BOX 1: DAILY TASKS
 with b1:
@@ -104,7 +105,7 @@ with b1:
         else:
             st.caption("No tasks for today.")
 
-# BOX 2: PERFORMANCE & UPCOMING EVENTS (UPDATED)
+# BOX 2: INTELLIGENCE & EVENTS
 with b2:
     with st.container(border=True):
         st.markdown('**🛡️ Intelligence & Events**')
@@ -113,9 +114,8 @@ with b2:
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
         st.markdown(f"<p style='margin:0; font-size:12px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
         
-        # UPCOMING EVENTS LOGIC
+        # Upcoming Events
         st.markdown("<p style='margin:0; font-size:12px; color:gray;'>CALENDAR HORIZON</p>", unsafe_allow_html=True)
-        # Fetch 3 events starting from today onwards
         events = fetch_query("""
             SELECT description, event_date 
             FROM events 
@@ -131,50 +131,33 @@ with b2:
         else:
             st.caption("No upcoming events.")
 
-# BOX 3: STRATEGY & INTELLECT
+# BOX 3: STRATEGY & INTELLECT (UPDATED TO SHOW 3 BLUEPRINT TASKS)
 with b3:
     with st.container(border=True):
         st.markdown('**🧠 Strategy & Intellect**')
-        upcoming = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 1", (user,))
-        if upcoming:
-            st.markdown(f"<p style='margin:0; font-size:12px; color:gray;'>BLUEPRINT FOCUS</p><p style='font-weight:bold; margin-bottom:10px;'>{upcoming[0][0].upper()} ({upcoming[0][1]}%)</p>", unsafe_allow_html=True)
-        else:
-            st.info("Strategy Map Clear")
         
+        # Fetch 3 most upcoming (highest progress) blueprint tasks
+        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>BLUEPRINT HORIZON</p>", unsafe_allow_html=True)
+        blueprint_tasks = fetch_query("""
+            SELECT task_description, progress 
+            FROM future_tasks 
+            WHERE user_email=%s AND progress < 100 
+            ORDER BY progress DESC 
+            LIMIT 3
+        """, (user,))
+        
+        if blueprint_tasks:
+            for desc, prog in blueprint_tasks:
+                st.markdown(f"**{prog}%**: {desc.upper()}")
+        else:
+            st.caption("Strategy Map Clear.")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Focus Time (Neural Lock)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
         st.metric("Focus Today", f"{mins}m")
-
-# BOX 4: ACADEMIC TIMETABLE
-with b4:
-    with st.container(border=True):
-        st.markdown('**🎓 Today\'s Classes**')
-        classes = fetch_query("""
-            SELECT start_time, subject, location 
-            FROM timetable 
-            WHERE user_email=%s AND day_name=%s 
-            ORDER BY start_time ASC
-        """, (user, d_name))
-        
-        if classes:
-            for ctime, csub, cloc_raw in classes:
-                try:
-                    time_part, loc = cloc_raw.split('|')
-                    start_str, end_str = time_part.split('-')
-                    display_start = datetime.strptime(start_str, "%H:%M").strftime("%I:%M %p")
-                    display_end = datetime.strptime(end_str, "%H:%M").strftime("%I:%M %p")
-                    full_time = f"{display_start} - {display_end}"
-                except:
-                    full_time = ctime.strftime('%I:%M %p')
-                
-                st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:5px; margin-bottom:8px; border-left:3px solid #76b372;">
-                        <span style="color:#76b372; font-size:10px; font-weight:bold;">{full_time}</span><br>
-                        <span style="font-size:12px; font-weight:bold;">{csub.upper()}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.caption("No classes scheduled today.")
 
 # 3. FINANCIAL OVERVIEW
 st.markdown("### 💰 Financial Status")
