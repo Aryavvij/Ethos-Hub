@@ -1,33 +1,62 @@
 import streamlit as st
+import pandas as pd
 from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 
 # 1. SET WIDE MODE & PAGE CONFIG
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 
-# --- CSS HEIGHT & SYMMETRY LOCK ---
+# --- CSS HEIGHT, SYMMETRY & PROGRESS RING LIFT ---
 st.markdown("""
     <style>
-    /* Centers all items vertically in the column */
     [data-testid="column"] {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: center;
+        justify-content: flex-start;
     }
-    /* Reduces the horizontal gap between elements */
     div[data-testid="stHorizontalBlock"] {
         gap: 6px !important;
     }
-    /* Standardize height for all interactive elements */
     .stCheckbox, .stButton, div[data-testid="stMarkdownContainer"] {
         height: 35px !important;
-        display: flex;
-        align-items: center;
     }
-    /* Align checkbox to the center of its 30% slot */
     .stCheckbox {
         justify-content: center;
-        margin-top: -15px; /* Offset for Streamlit's default label padding */
+        margin-top: -15px;
+    }
+    
+    /* PROGRESS RING STYLING */
+    .progress-container {
+        position: relative;
+        width: 60px;
+        height: 60px;
+        margin-bottom: 15px;
+    }
+    .circular-chart {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    .circle-bg {
+        fill: none;
+        stroke: #333;
+        stroke-width: 3.8;
+    }
+    .circle {
+        fill: none;
+        stroke-width: 2.8;
+        stroke-linecap: round;
+        transition: stroke-dasharray 0.6s ease 0s;
+        stroke: #76b372;
+    }
+    .percentage {
+        fill: #76b372;
+        font-family: sans-serif;
+        font-size: 0.5em;
+        text-anchor: middle;
+        font-weight: bold;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -59,10 +88,31 @@ cols = st.columns(7)
 
 for i, day_name in enumerate(days):
     this_date = start_date + timedelta(days=i)
+    
+    # FETCH DATA FIRST TO CALCULATE PROGRESS
+    tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
+                        (user, i, start_date))
+    
+    total_tasks = len(tasks)
+    done_tasks = sum(1 for t in tasks if t[2]) # t[2] is is_done
+    progress_pct = int((done_tasks / total_tasks * 100)) if total_tasks > 0 else 0
+    
     with cols[i]:
         # Day Header
-        st.markdown(f"""<div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; margin-bottom: 10px; width:100%;">
+        st.markdown(f"""<div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; margin-bottom: 5px; width:100%;">
             <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small></div>""", unsafe_allow_html=True)
+        
+        # --- CIRCULAR PROGRESS BAR ---
+        # SVG Stroke-dasharray calculation: circumference is approx 100
+        st.markdown(f"""
+            <div class="progress-container">
+                <svg viewBox="0 0 36 36" class="circular-chart">
+                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    <path class="circle" stroke-dasharray="{progress_pct}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                    <text x="18" y="20.35" class="percentage">{progress_pct}%</text>
+                </svg>
+            </div>
+        """, unsafe_allow_html=True)
         
         # New Task Input
         new_task = st.text_input("Task", key=f"in_{i}", label_visibility="collapsed", placeholder="+ New Task")
@@ -74,20 +124,14 @@ for i, day_name in enumerate(days):
         
         st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
         
-        # Pull tasks from database
-        tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
-                            (user, i, start_date))
-        
         # --- TASK LIST RENDERING: 70:30 SPLIT ---
         for tid, tname, tdone in tasks:
-            # c_left (70%) for the Task Box | c_right (30%) for the Checkbox
             c_left, c_right = st.columns([0.7, 0.3])
             
             with c_left:
                 status_color = "#76b372" if tdone else "#ff4b4b"
                 bg_opacity = "rgba(118, 179, 114, 0.2)" if tdone else "rgba(255, 75, 75, 0.1)"
                 
-                # Task Description Box
                 st.markdown(f"""
                     <div style="background:{bg_opacity}; color:{status_color}; border: 1px solid {status_color}; 
                     border-radius: 4px; text-align: center; font-weight: bold; font-size: 10px; 
@@ -98,7 +142,6 @@ for i, day_name in enumerate(days):
                 """, unsafe_allow_html=True)
             
             with c_right:
-                # The single status checkbox
                 if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
                     if not tdone:
                         execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
@@ -108,7 +151,6 @@ for i, day_name in enumerate(days):
                         execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
                         st.rerun()
 
-        # Add a "Clear Day" option at bottom of each column for maintenance
         if tasks:
             if st.button("🗑️", key=f"clr_{i}", help=f"Clear {day_name}"):
                 execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, i, start_date))
