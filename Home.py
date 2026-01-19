@@ -104,40 +104,48 @@ with b1:
         else:
             st.caption("No tasks for today.")
 
-# BOX 2: PERFORMANCE & EVENTS
+# BOX 2: PERFORMANCE & UPCOMING EVENTS (UPDATED)
 with b2:
     with st.container(border=True):
-        st.markdown('**🛡️ Performance & Events**')
-        # Training Split (From Iron Clad)
+        st.markdown('**🛡️ Intelligence & Events**')
+        # Training Split
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
         st.markdown(f"<p style='margin:0; font-size:12px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
         
-        # Calendar Event
-        events = fetch_query("SELECT description FROM events WHERE user_email=%s AND event_date=%s", (user, t_date))
+        # UPCOMING EVENTS LOGIC
+        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>CALENDAR HORIZON</p>", unsafe_allow_html=True)
+        # Fetch 3 events starting from today onwards
+        events = fetch_query("""
+            SELECT description, event_date 
+            FROM events 
+            WHERE user_email=%s AND event_date >= %s 
+            ORDER BY event_date ASC 
+            LIMIT 3
+        """, (user, t_date))
+        
         if events:
-            for ev in events:
-                st.warning(f"🔔 {ev[0].upper()}")
+            for desc, edate in events:
+                date_str = edate.strftime("%b %d")
+                st.markdown(f"**{date_str}**: {desc}")
         else:
-            st.caption("No events.")
+            st.caption("No upcoming events.")
 
 # BOX 3: STRATEGY & INTELLECT
 with b3:
     with st.container(border=True):
         st.markdown('**🧠 Strategy & Intellect**')
-        # Blueprint Task
         upcoming = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 1", (user,))
         if upcoming:
             st.markdown(f"<p style='margin:0; font-size:12px; color:gray;'>BLUEPRINT FOCUS</p><p style='font-weight:bold; margin-bottom:10px;'>{upcoming[0][0].upper()} ({upcoming[0][1]}%)</p>", unsafe_allow_html=True)
         else:
             st.info("Strategy Map Clear")
         
-        # Focus Time (Neural Lock)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
         st.metric("Focus Today", f"{mins}m")
 
-# BOX 4: ACADEMIC TIMETABLE (SYNCED START & END TIMES)
+# BOX 4: ACADEMIC TIMETABLE
 with b4:
     with st.container(border=True):
         st.markdown('**🎓 Today\'s Classes**')
@@ -151,14 +159,12 @@ with b4:
         if classes:
             for ctime, csub, cloc_raw in classes:
                 try:
-                    # Parsing the "HH:MM-HH:MM|Location" format stored in location field
                     time_part, loc = cloc_raw.split('|')
                     start_str, end_str = time_part.split('-')
                     display_start = datetime.strptime(start_str, "%H:%M").strftime("%I:%M %p")
                     display_end = datetime.strptime(end_str, "%H:%M").strftime("%I:%M %p")
                     full_time = f"{display_start} - {display_end}"
                 except:
-                    # Fallback for old data formats
                     full_time = ctime.strftime('%I:%M %p')
                 
                 st.markdown(f"""
