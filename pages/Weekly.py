@@ -5,9 +5,10 @@ from database import execute_query, fetch_query
 # 1. SET WIDE MODE & PAGE CONFIG
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 
-# --- CSS: ABSOLUTE SYMMETRY & OVERLAP FIX ---
+# --- CSS: GRID PERSISTENCE & ALIGNMENT LOCK ---
 st.markdown("""
     <style>
+    /* Prevent columns from drifting or overlapping */
     [data-testid="column"] {
         display: flex;
         flex-direction: column;
@@ -15,32 +16,33 @@ st.markdown("""
         justify-content: flex-start;
     }
     
-    /* Lock the Progress Ring Space */
+    /* Progress Ring Container */
     .progress-wrapper {
         width: 100%;
-        height: 110px; 
+        height: 100px; 
         display: flex;
         justify-content: center;
         align-items: center;
         margin-bottom: 5px;
     }
     
-    .circular-chart { width: 85px; height: 85px; }
+    .circular-chart { width: 80px; height: 80px; }
     .circle-bg { fill: none; stroke: #333; stroke-width: 2.8; }
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
 
-    /* Task Row Styling */
-    .task-container {
-        width: 100%;
-        margin-top: 10px;
+    /* Task Row: Matches the Habit Lab style */
+    .stCheckbox {
+        height: 32px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
-    /* Standardize Button Heights */
-    .stButton > button {
+    /* Lock the input and button heights to 32px */
+    .stTextInput > div > div > input, .stButton > button {
         height: 32px !important;
-        padding: 0px !important;
-        font-size: 12px !important;
+        min-height: 32px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -61,7 +63,7 @@ with st.sidebar:
 
 st.title("🗓️ Weekly Planner")
 
-# Date Input (Auto-calculated to the current Monday)
+# Date Input
 start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
 
 # 3. WEEKLY GRID (7 Columns for 7 Days)
@@ -108,23 +110,38 @@ for i, day_name in enumerate(days):
         
         st.markdown("<hr style='margin:10px 0; border:0.5px solid #333;'>", unsafe_allow_html=True)
         
-        # --- TASK LIST: TWO COLUMN TABLE LOGIC ---
+        # --- TASK LIST: TWO COLUMN PERSISTENT GRID ---
         for tid, tname, tdone in tasks:
-            # Column 1 (Task Text) | Column 2 (Finish Button)
-            t_col, b_col = st.columns([0.65, 0.35])
+            # 75% Task Name | 25% Checkbox
+            t_col, c_col = st.columns([0.75, 0.25])
             
             with t_col:
-                # Styled box for the Task Text
+                # Text box styling: remains green/red based on status
+                status_color = "#76b372" if tdone else "#ff4b4b"
+                bg_opacity = "rgba(118, 179, 114, 0.15)" if tdone else "rgba(255, 75, 75, 0.1)"
+                
                 st.markdown(f"""
-                    <div style="background:rgba(255,255,255,0.05); color:white; border: 1px solid #444; 
+                    <div style="background:{bg_opacity}; color:{status_color}; border: 1px solid {status_color}; 
                     border-radius: 4px; text-align: left; font-size: 11px; height: 32px; 
                     line-height: 30px; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
                         {tname.upper()}
                     </div>
                 """, unsafe_allow_html=True)
             
-            with b_col:
-                # The Finish Button: Deletes task upon press to clear the board
-                if st.button("FINISH", key=f"fin_{tid}", use_container_width=True):
-                    execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
-                    st.rerun()
+            with c_col:
+                # Toggle Checkbox: Updates DB but stays visible
+                if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
+                    if not tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
+                        st.rerun()
+                else:
+                    if tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
+                        st.rerun()
+
+        # Maintenance Trash Icon (at the very bottom of each column)
+        if tasks:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🗑️", key=f"clr_{i}", help="Clear all tasks for this day", use_container_width=True):
+                execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, i, start_date))
+                st.rerun()
