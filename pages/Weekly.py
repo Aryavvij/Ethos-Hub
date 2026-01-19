@@ -2,13 +2,13 @@ import streamlit as st
 from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 
-# 1. SET WIDE MODE & PAGE CONFIG
+# 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 
-# --- CSS: GRID ALIGNMENT & SPACING LOCK ---
+# --- CLEAN CSS: NO OVERLAP, JUST SPACING ---
 st.markdown("""
     <style>
-    /* Ensure columns align properly from the top */
+    /* Ensure all elements in the column are centered and spaced properly */
     [data-testid="column"] {
         display: flex;
         flex-direction: column;
@@ -16,7 +16,7 @@ st.markdown("""
         justify-content: flex-start;
     }
     
-    /* Progress Circle: Centered and Non-Overlapping */
+    /* Progress Circle: Fixed height prevents overlap with input boxes */
     .progress-wrapper {
         width: 100%;
         height: 100px; 
@@ -30,16 +30,9 @@ st.markdown("""
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
 
-    /* Input & Row Height Normalization */
-    .stTextInput, .stButton, .stCheckbox {
-        height: 35px !important;
-    }
-    
-    /* Force Checkbox to align vertically with Task Box */
+    /* Fix checkbox alignment within the task row */
     div[data-testid="stCheckbox"] {
-        margin-top: -12px;
-        display: flex;
-        justify-content: center;
+        margin-bottom: 15px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -79,7 +72,7 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # PROGRESS RING
+        # PROGRESS RING (Fixed space wrapper)
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -90,9 +83,9 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # NEW TASK INPUT ROW (Table Style)
+        # INPUT SECTION: Structured two-column table style
         with st.container():
-            in_col, add_col = st.columns([0.7, 0.3])
+            in_col, add_col = st.columns([0.65, 0.35], vertical_alignment="bottom")
             new_task = in_col.text_input("Task", key=f"in_{i}", label_visibility="collapsed", placeholder="+ New")
             if add_col.button("ADD", key=f"btn_{i}", use_container_width=True):
                 if new_task:
@@ -102,10 +95,10 @@ for i, day_name in enumerate(days):
 
         st.markdown("<hr style='margin:10px 0; border:0.5px solid #333;'>", unsafe_allow_html=True)
         
-        # --- THE 2-COLUMN TASK TABLE ---
+        # --- THE TASK TABLE ROWS ---
         for tid, tname, tdone in tasks:
-            # 70% Text | 30% Checkbox
-            row_col_text, row_col_check = st.columns([0.75, 0.25])
+            # 75:25 Split for Task Text and Checkbox
+            row_col_text, row_col_check = st.columns([0.75, 0.25], vertical_alignment="center")
             
             with row_col_text:
                 status_color = "#76b372" if tdone else "#ff4b4b"
