@@ -100,7 +100,6 @@ with st.container(border=True):
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 
 if not valid_df.empty:
-    st.markdown("---")
     
     # Pre-calculate stats for both chart and table
     total_habits_count = len(valid_df)
