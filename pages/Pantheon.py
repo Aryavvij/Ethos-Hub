@@ -13,7 +13,7 @@ user = st.session_state.user_email
 st.title("🏆 The Pantheon")
 st.caption("Universal Knowledge Repository: Structured Rankings & Deep Notes")
 
-# --- 2. DUAL-MODE INPUT SECTION ---
+# --- 2. DUAL-MODE INPUT SECTION (FIXED ALIGNMENT) ---
 with st.container(border=True):
     st.subheader("Expand the Pantheon")
     t1, t2 = st.tabs(["📊 Create Ranking Table", "📝 Create Master Note"])
@@ -22,6 +22,9 @@ with st.container(border=True):
         c1, c2, c3 = st.columns([2, 2, 1])
         cat_name = c1.text_input("Category Title", placeholder="e.g., Top Tech Stocks", key="new_cat")
         item_name = c2.text_input("Initial Entry", placeholder="e.g., NVIDIA", key="new_item")
+        
+        # Spacer to align button with text inputs
+        c3.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
         if c3.button("➕ Initialize Table", use_container_width=True):
             if cat_name and item_name:
                 execute_query("INSERT INTO rankings (user_email, category, item_name, rank_order) VALUES (%s, %s, %s, %s)",
@@ -31,6 +34,9 @@ with st.container(border=True):
     with t2:
         n1, n2, n3 = st.columns([2, 2, 1])
         note_title = n1.text_input("Note Title", placeholder="e.g., Thesis Observations", key="new_note_title")
+        
+        # Spacer to align button with text inputs
+        n3.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
         if n3.button("📝 Initialize Note", use_container_width=True):
             if note_title:
                 # We save notes as a special category with a '[NOTE]' prefix
