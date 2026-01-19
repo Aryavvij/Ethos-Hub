@@ -3,7 +3,7 @@ import time
 import pandas as pd
 import plotly.express as px
 from database import execute_query, fetch_query
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="Neural Lock", page_icon="🔒")
@@ -14,23 +14,24 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 user = st.session_state.user_email
 
+# --- 2. AUTOMATIC DATE RECOGNITION ---
+# This ensures the UI is always aware of the "Now"
+now = datetime.now()
+t_date = now.date()
 st.title("🔒 Neural Lock")
-st.caption("High-Intensity Focus Engine")
+st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
 
-# --- 2. MONTHLY SELECTOR ENGINE ---
-# This allows you to view historical data by selecting month/year
+# --- 3. MONTHLY SELECTOR ENGINE ---
 c_sel1, c_sel2 = st.columns([2, 1])
 with c_sel1:
     month_names = ["January", "February", "March", "April", "May", "June", 
                    "July", "August", "September", "October", "November", "December"]
-    # Default to current month
-    selected_month_name = st.selectbox("View Results for Month", month_names, index=datetime.now().month-1)
+    selected_month_name = st.selectbox("View History", month_names, index=now.month-1)
     month_num = month_names.index(selected_month_name) + 1
 with c_sel2:
-    # Default to current year (2026)
     selected_year = st.selectbox("Year", [2025, 2026, 2027], index=1)
 
-# --- 3. DATA ENGINE (Filtered by Selection) ---
+# --- 4. DATA ENGINE (The "Day Recognition" Logic) ---
 monthly_raw = fetch_query("""
     SELECT EXTRACT(DAY FROM session_date) as day, SUM(duration_mins) 
     FROM focus_sessions 
@@ -42,13 +43,12 @@ monthly_raw = fetch_query("""
 
 m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
 
-# --- 4. OVERVIEW METRICS ---
+# --- 5. OVERVIEW METRICS ---
 m1, m2, m3 = st.columns(3)
 with m1:
-    # Logic: Show "Today" only if viewing the current month/year
-    if month_num == datetime.now().month and selected_year == datetime.now().year:
-        today_day = datetime.now().day
-        today_mins = m_df[m_df["Day"] == today_day]["Mins"].sum()
+    # AUTO-RECOGNITION: Checks if viewing today's month/year
+    if month_num == now.month and selected_year == now.year:
+        today_mins = m_df[m_df["Day"] == now.day]["Mins"].sum()
         st.metric("Focus Today", f"{int(today_mins)}m")
     else:
         month_total = m_df["Mins"].sum()
@@ -61,31 +61,20 @@ with m3:
     status = "🔴 IDLE" if 'stopwatch_start' not in st.session_state or st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
     st.metric("System Status", status)
 
-# --- 5. MONTHLY MOMENTUM GRAPH ---
-st.subheader(f"🌊 Focus Momentum: {selected_month_name} {selected_year}")
+# --- 6. MONTHLY MOMENTUM GRAPH ---
 if not m_df.empty:
     fig_m = px.area(m_df, x="Day", y="Mins", color_discrete_sequence=['#76b372'], template="plotly_dark")
-    
     fig_m.update_layout(
         height=250, margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(
-            showgrid=False, 
-            title="Day of Month",
-            tickmode='linear', 
-            tick0=1, 
-            dtick=1, 
-            range=[1, 31]
-        ), 
+        xaxis=dict(showgrid=False, title="Day", tickmode='linear', dtick=5, range=[1, 31]), 
         yaxis=dict(showgrid=True, title="Minutes")
     )
     st.plotly_chart(fig_m, use_container_width=True)
-else:
-    st.info(f"No focus sessions recorded for {selected_month_name} {selected_year}.")
 
 st.markdown("---")
 
-# --- 6. THE ENGINE ROOM (STOPWATCH & DAILY LOG) ---
+# --- 7. THE ENGINE ROOM (STOPWATCH) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
 with col_timer:
@@ -99,7 +88,7 @@ with col_timer:
         st.session_state.stopwatch_start = None
 
     if st.session_state.stopwatch_start is None:
-        timer_placeholder.markdown("""
+        timer_placeholder.markdown(f"""
             <div style="text-align: center; border: 2px solid #333; padding: 40px; border-radius: 15px; background: rgba(255, 255, 255, 0.02);">
                 <h1 style="font-size: 60px; color: #444; margin: 0; font-family: monospace;">00:00</h1>
                 <p style="color: #666; letter-spacing: 2px;">READY TO INITIATE</p>
@@ -112,6 +101,7 @@ with col_timer:
                 st.session_state.stopwatch_start = time.time()
                 st.rerun()
     else:
+        # DATA LOGGING: explicitly uses CURRENT_DATE for recognition
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
@@ -122,7 +112,7 @@ with col_timer:
             st.session_state.stopwatch_start = None
             st.rerun()
 
-        # Simple timer display logic
+        # Stopwatch Display
         elapsed = int(time.time() - st.session_state.stopwatch_start)
         mins, secs = divmod(elapsed, 60)
         timer_placeholder.markdown(f"""
@@ -133,8 +123,8 @@ with col_timer:
         """, unsafe_allow_html=True)
 
 with col_log:
-    st.subheader("📋 Today's Logged Sessions")
-    
+    st.subheader("📋 Today's Log")
+    # Query recognizes CURRENT_DATE to isolate today's sessions
     today_data = fetch_query("""
         SELECT task_name, duration_mins 
         FROM focus_sessions 
@@ -143,15 +133,8 @@ with col_log:
     """, (user,))
     
     if today_data:
-        log_df = pd.DataFrame(today_data, columns=["Objective / Task", "Duration (Mins)"])
-        st.dataframe(
-            log_df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Objective / Task": st.column_config.TextColumn("Objective / Task", width="large"),
-                "Duration (Mins)": st.column_config.NumberColumn("Mins", format="%d m")
-            }
-        )
+        log_df = pd.DataFrame(today_data, columns=["Objective", "Duration"])
+        st.dataframe(log_df, use_container_width=True, hide_index=True,
+            column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")})
     else:
         st.caption("No sessions logged today.")
