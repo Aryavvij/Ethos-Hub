@@ -30,8 +30,7 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 4. DATA ENGINE (FIXED: SESSION STATE BRIDGE) ---
-# Create a unique key for the current month/year
+# --- 4. DATA ENGINE (SESSION STATE BRIDGE) ---
 data_key = f"data_{month_num}_{year}_{st.session_state.habit_version}"
 
 if data_key not in st.session_state:
@@ -42,7 +41,6 @@ if data_key not in st.session_state:
     db_habits = sorted(list(set([row[0] for row in raw_data if row[0]])))
     
     rows = []
-    # If brand new: ONLY ONE single empty row.
     if not db_habits:
         new_row = {"Habit Name": ""}
         for d in day_cols: new_row[d] = False
@@ -58,7 +56,7 @@ if data_key not in st.session_state:
     
     st.session_state[data_key] = pd.DataFrame(rows, columns=["Habit Name"] + day_cols)
 
-# --- 5. MAIN EDITOR ---
+# --- 5. MAIN EDITOR (INPUT TABLE FIRST) ---
 with st.container(border=True):
     st.subheader(f"🗓️ {month_name} Grid")
     
@@ -68,7 +66,6 @@ with st.container(border=True):
     for day in day_cols:
         col_config[day] = st.column_config.CheckboxColumn(day, default=False, width="small")
 
-    # Use the session state data as the source
     edited_df = st.data_editor(
         st.session_state[data_key], 
         use_container_width=True, 
@@ -79,13 +76,9 @@ with st.container(border=True):
     )
 
     if st.button("💾 Synchronize System", use_container_width=True):
-        # 1. Update the session state immediately
         st.session_state[data_key] = edited_df
-        
-        # 2. Wipe DB for this month
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
         
-        # 3. Save from the edited_df
         save_count = 0
         for _, row in edited_df.iterrows():
             h_name = row.get("Habit Name")
@@ -99,32 +92,22 @@ with st.container(border=True):
                         )
                 save_count += 1
         
-        # 4. Bump version to force a clean re-fetch next time and clear phantom rows
         st.session_state.habit_version += 1
         st.success(f"Successfully Synchronized {save_count} habits.")
         st.rerun()
 
-# --- 6. PERFORMANCE & MOMENTUM ---
+# --- 6. PERFORMANCE & MOMENTUM (REORDERED SECTION) ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 
 if not valid_df.empty:
     st.markdown("---")
+    
+    # Pre-calculate stats for both chart and table
     total_habits_count = len(valid_df)
     daily_done = valid_df[day_cols].sum(axis=0).astype(int)
     daily_progress = ((daily_done / total_habits_count) * 100).round(1)
 
-    # Performance Matrix
-    stats_df = pd.DataFrame({
-        "Progress": [f"{p}%" for p in daily_progress],
-        "Done": daily_done.values,
-        "Total": [total_habits_count] * days_in_month
-    }).T
-    stats_df.columns = day_cols
-    st.subheader("📊 Performance Matrix")
-    st.dataframe(stats_df, use_container_width=True)
-
-    # Momentum Chart
-    st.markdown("<br>", unsafe_allow_html=True)
+    # A. MOMENTUM CHART (GRAPH SECOND)
     st.subheader("🌊 Consistency Momentum")
     chart_data = pd.DataFrame({"Day": [int(d) for d in day_cols], "Completed": daily_done.values})
     fig = px.area(chart_data, x="Day", y="Completed", color_discrete_sequence=['#76b372'], template="plotly_dark")
@@ -134,3 +117,15 @@ if not valid_df.empty:
         xaxis=dict(title="Day of Month", tickmode='linear', dtick=5, gridcolor="rgba(255,255,255,0.05)")
     )
     st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # B. PERFORMANCE MATRIX (TABLE THIRD)
+    stats_df = pd.DataFrame({
+        "Progress": [f"{p}%" for p in daily_progress],
+        "Done": daily_done.values,
+        "Total": [total_habits_count] * days_in_month
+    }).T
+    stats_df.columns = day_cols
+    st.subheader("📊 Performance Matrix")
+    st.dataframe(stats_df, use_container_width=True)
