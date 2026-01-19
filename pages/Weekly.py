@@ -5,18 +5,19 @@ from database import execute_query, fetch_query
 # 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
 
-# --- CLEAN CSS: NO OVERLAP, JUST SPACING ---
+# --- CSS: ABSOLUTE GRID LOCK ---
 st.markdown("""
     <style>
-    /* Ensure all elements in the column are centered and spaced properly */
+    /* 1. Fix the Column Widths and prevent vertical drifting */
     [data-testid="column"] {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
+        min-width: 0px !important;
     }
-    
-    /* Progress Circle: Fixed height prevents overlap with input boxes */
+
+    /* 2. Progress Circle: Fixed Space Lock */
     .progress-wrapper {
         width: 100%;
         height: 100px; 
@@ -30,9 +31,21 @@ st.markdown("""
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
 
-    /* Fix checkbox alignment within the task row */
-    div[data-testid="stCheckbox"] {
-        margin-bottom: 15px;
+    /* 3. TASK ROW: The "Table Row" look */
+    .task-row-container {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        height: 40px;
+        margin-bottom: 5px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        border: 1px solid #444;
+    }
+    
+    /* 4. Input Field Normalization */
+    input {
+        font-size: 12px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -49,7 +62,7 @@ st.title("🗓️ Weekly Planner")
 # Date Input
 start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
 
-# 3. WEEKLY GRID (7 Columns)
+# 3. WEEKLY GRID
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 cols = st.columns(7)
 
@@ -72,7 +85,7 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # PROGRESS RING (Fixed space wrapper)
+        # PROGRESS RING
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -83,11 +96,10 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # INPUT SECTION: Structured two-column table style
+        # ADD TASK SECTION (Single unit to prevent misalignment)
         with st.container():
-            in_col, add_col = st.columns([0.65, 0.35], vertical_alignment="bottom")
-            new_task = in_col.text_input("Task", key=f"in_{i}", label_visibility="collapsed", placeholder="+ New")
-            if add_col.button("ADD", key=f"btn_{i}", use_container_width=True):
+            new_task = st.text_input("Add", key=f"in_{i}", label_visibility="collapsed", placeholder="+ Task")
+            if st.button("ADD", key=f"btn_{i}", use_container_width=True):
                 if new_task:
                     execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, %s)", 
                                   (user, i, new_task, start_date, False))
@@ -95,24 +107,17 @@ for i, day_name in enumerate(days):
 
         st.markdown("<hr style='margin:10px 0; border:0.5px solid #333;'>", unsafe_allow_html=True)
         
-        # --- THE TASK TABLE ROWS ---
+        # --- THE TASK LIST ---
         for tid, tname, tdone in tasks:
-            # 75:25 Split for Task Text and Checkbox
-            row_col_text, row_col_check = st.columns([0.75, 0.25], vertical_alignment="center")
+            # We use a single container to hold both text and checkbox to avoid column-splitting bugs
+            status_color = "#76b372" if tdone else "#ff4b4b"
             
-            with row_col_text:
-                status_color = "#76b372" if tdone else "#ff4b4b"
-                bg_opacity = "rgba(118, 179, 114, 0.15)" if tdone else "rgba(255, 75, 75, 0.05)"
-                st.markdown(f"""
-                    <div style="background:{bg_opacity}; color:{status_color}; border: 1px solid {status_color}; 
-                    border-radius: 4px; text-align: left; font-size: 10px; height: 35px; 
-                    line-height: 33px; padding: 0 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">
-                        {tname.upper()}
-                    </div>
-                """, unsafe_allow_html=True)
-            
-            with row_col_check:
-                if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
+            # Using Markdown for the name and a checkbox right next to it
+            # To ensure they never split, we place them in a small container
+            with st.container(border=True):
+                # We show the name and a checkbox. Clicking the checkbox updates the DB.
+                # Label is the task name to save space
+                if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
                     if not tdone:
                         execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
                         st.rerun()
