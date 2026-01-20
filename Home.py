@@ -97,8 +97,10 @@ with b1:
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
             for tname, tdone in tasks:
+                # Color the text itself based on status instead of using a dot
                 color = "#76b372" if tdone else "#ff4b4b"
-                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px;'><span style='color:{color};'>{'' if tdone else '○'}</span> {tname}</p>", unsafe_allow_html=True)
+                # Removed the <span>●</span> or <span>○</span> part
+                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:{color};'>{tname}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
         st.markdown(" ")
