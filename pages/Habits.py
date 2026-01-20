@@ -106,7 +106,6 @@ if not valid_df.empty:
     total_habits_count = len(valid_df)
     daily_done = valid_df[day_cols].sum(axis=0).astype(int)
     
-    # Consistency Momentum Chart
     st.subheader("Consistency Momentum")
     chart_data = pd.DataFrame({"Day": [int(d) for d in day_cols], "Completed": daily_done.values})
     fig = px.area(chart_data, x="Day", y="Completed", color_discrete_sequence=['#76b372'], template="plotly_dark")
@@ -119,19 +118,19 @@ if not valid_df.empty:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Monthly Habit Performance Matrix
+    # REFINED MONTHLY HABIT MATRIX
     st.subheader("Monthly Habit Matrix")
     habit_stats = []
-    for _, row in valid_df.iterrows():
+    for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
         done_count = sum(1 for d in day_cols if row[d] == True)
         pct = (done_count / days_in_month) * 100
         habit_stats.append({
-            "Habit": name.upper(),
+            "#": i,
+            "Habit": name,
             "Days Completed": done_count,
-            "Monthly Consistency": f"{pct:.1f}%",
-            "Status": "🔥 Optimal" if pct >= 80 else "⚠️ Improving" if pct >= 50 else "❄️ At Risk"
+            "Monthly Consistency": f"{pct:.1f}%"
         })
     
     stats_display_df = pd.DataFrame(habit_stats)
-    st.table(stats_display_df)
+    st.table(stats_display_df.set_index('#'))
