@@ -118,24 +118,45 @@ if not valid_df.empty:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # REFINED MONTHLY HABIT MATRIX
-    st.subheader("Monthly Habit Matrix")
+    # MODERNIZED MONTHLY HABIT MATRIX (CARD VIEW)
+    st.subheader("Monthly Performance Overview")
+    
     habit_stats = []
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
         if name:
             done_count = sum(1 for d in day_cols if row[d] == True)
             pct = (done_count / days_in_month) * 100
-            
             habit_stats.append({
-                "#": str(i), 
+                "#": str(i),
                 "Habit": name,
-                "Days Completed": str(done_count), 
-                "Monthly Consistency": f"{pct:.1f}%"
+                "Days Completed": str(done_count),
+                "Consistency": pct
             })
-    
+
     if habit_stats:
-        stats_display_df = pd.DataFrame(habit_stats)
-        st.table(stats_display_df.set_index('#'))
+        cols = st.columns(3)
+        for idx, stat in enumerate(habit_stats):
+            with cols[idx % 3]:
+                # Dynamic Color Coding
+                color = "#76b372" if stat["Consistency"] >= 80 else "#ffab40" if stat["Consistency"] >= 50 else "#ff4b4b"
+                
+                st.markdown(f"""
+                    <div style="border: 1px solid #333; border-radius: 10px; padding: 15px; 
+                                background: rgba(255,255,255,0.03); margin-bottom: 15px; border-left: 5px solid {color};">
+                        <p style="margin:0; font-size:11px; color:gray; text-transform:uppercase; letter-spacing:1px;">Habit #{stat["#"]}</p>
+                        <h3 style="margin:5px 0 15px 0; color:white; font-size:18px;">{stat["Habit"]}</h3>
+                        <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                            <div>
+                                <p style="margin:0; font-size:10px; color:gray;">DAYS DONE</p>
+                                <p style="margin:0; font-weight:bold; font-size:20px;">{stat["Days Completed"]}</p>
+                            </div>
+                            <div style="text-align:right;">
+                                <p style="margin:0; font-size:10px; color:gray;">CONSISTENCY</p>
+                                <p style="margin:0; font-weight:bold; font-size:22px; color:{color};">{stat["Consistency"]:.1f}%</p>
+                            </div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
     else:
         st.info("Log and Synchronize habits to view the Performance Matrix.")
