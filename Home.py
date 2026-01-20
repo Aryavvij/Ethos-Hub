@@ -51,7 +51,7 @@ render_sidebar()
 st.title("ETHOS HUB")
 
 # 1. STRATEGIC SEMESTER GOALS
-st.markdown("### 🎯 Strategic Semester Goals")
+st.markdown("### 🎯 Strategic Personal Goals")
 res = fetch_query("SELECT academic, health, personal FROM semester_goals WHERE user_email=%s", (user,))
 g_acad, g_health, g_pers = res[0] if res else ("", "", "")
 
@@ -81,7 +81,7 @@ if st.button("Update Goals", use_container_width=True):
 st.markdown("---")
 
 # --- 2. THE 3-BOX INTEGRATED COMMAND CENTER ---
-st.markdown("### ⚡ Today's System Briefing")
+st.markdown("### Today's Briefing")
 
 t_date = datetime.now().date()
 d_name = t_date.strftime("%A")
@@ -94,7 +94,7 @@ b1, b2, b3 = st.columns(3)
 # BOX 1: DAILY TASKS
 with b1:
     with st.container(border=True):
-        st.markdown('**📋 Daily Tasks**')
+        st.markdown("**Today's Tasks**")
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
             for tname, tdone in tasks:
@@ -106,14 +106,14 @@ with b1:
 # BOX 2: INTELLIGENCE & EVENTS
 with b2:
     with st.container(border=True):
-        st.markdown('**🛡️ Intelligence & Events**')
+        st.markdown('**Upcoming Events**')
         # Training Split
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
         st.markdown(f"<p style='margin:0; font-size:12px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
         
         # Upcoming Events
-        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>CALENDAR HORIZON</p>", unsafe_allow_html=True)
+        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>CALENDAR</p>", unsafe_allow_html=True)
         events = fetch_query("""
             SELECT description, event_date 
             FROM events 
@@ -132,10 +132,10 @@ with b2:
 # BOX 3: STRATEGY & INTELLECT (UPDATED TO SHOW 3 BLUEPRINT TASKS)
 with b3:
     with st.container(border=True):
-        st.markdown('**🧠 Strategy & Intellect**')
+        st.markdown('**Academic Overview**')
         
         # Fetch 3 most upcoming (highest progress) blueprint tasks
-        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>BLUEPRINT HORIZON</p>", unsafe_allow_html=True)
+        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>Trajectory</p>", unsafe_allow_html=True)
         blueprint_tasks = fetch_query("""
             SELECT task_description, progress 
             FROM future_tasks 
@@ -150,15 +150,13 @@ with b3:
         else:
             st.caption("Strategy Map Clear.")
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
         # Focus Time (Neural Lock)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
         st.metric("Focus Today", f"{mins}m")
 
 # 3. FINANCIAL OVERVIEW
-st.markdown("### 💰 Financial Status")
+st.markdown("### Financial Status")
 f1, f2 = st.columns(2)
 period = t_date.strftime("%B %Y")
 
