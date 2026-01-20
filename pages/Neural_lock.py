@@ -52,7 +52,7 @@ with m1:
     # AUTO-RECOGNITION: Checks if viewing today's month/year
     if month_num == now.month and selected_year == now.year:
         today_mins = m_df[m_df["Day"] == now.day]["Mins"].sum()
-        st.metric("Focus Today", f"{int(today_mins)}m")
+        st.metric("Today's Focus", f"{int(today_mins)}m")
     else:
         month_total = m_df["Mins"].sum()
         st.metric(f"Total Focus ({selected_month_name[:3]})", f"{int(month_total)}m")
@@ -81,7 +81,7 @@ st.markdown("---")
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
 with col_timer:
-    st.subheader("🚀 Focus Session")
+    st.subheader("Focus Session")
     task_name = st.text_input("Objective", placeholder="What are you crushing right now?", label_visibility="collapsed")
     
     timer_placeholder = st.empty()
@@ -98,7 +98,7 @@ with col_timer:
             </div>
         """, unsafe_allow_html=True)
         
-        if action_placeholder.button("⚡ INITIATE NEURAL LOCK", use_container_width=True):
+        if action_placeholder.button("INITIATE STOPWATCH", use_container_width=True):
             if not task_name: st.error("Define an objective first.")
             else:
                 st.session_state.stopwatch_start = time.time()
@@ -126,7 +126,7 @@ with col_timer:
         """, unsafe_allow_html=True)
 
 with col_log:
-    st.subheader("📋 Today's Log")
+    st.subheader("Today's Log")
     # Query recognizes CURRENT_DATE to isolate today's sessions
     today_data = fetch_query("""
         SELECT task_name, duration_mins 
