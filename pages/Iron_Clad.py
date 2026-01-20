@@ -84,7 +84,7 @@ all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "
 updated_sessions = []
 
 for group in muscle_groups:
-    with st.expander(f"➔ {group.upper()} Progress", expanded=(group == "Abs")):
+    with st.expander(f"➔ {group.upper()} PROGRESS", expanded=(group == "Abs")):
         group_df = all_ex_df[all_ex_df["Group"] == group].copy()
         
         if group_df.empty:
