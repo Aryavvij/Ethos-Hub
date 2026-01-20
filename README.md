@@ -5,7 +5,7 @@ The Ethos System is a full-stack personal resource planning (PRP) application de
 
 ---
 
-## 🛠️ Technical Implementation Summary
+## Technical Implementation Summary
 
 * **Relational Database Integrity:** Powered by a **PostgreSQL** backend. The developer implemented a normalized schema that supports multi-user partitioning through unique identifier keys, ensuring data persistence and secure concurrent sessions.
 * **Stateful Multi-Page Routing:** Leveraging **Streamlit’s session state**, the developer engineered a secure authentication layer (SHA-256) and a persistent global sidebar, maintaining user identity across nine independent modules.
@@ -15,7 +15,7 @@ The Ethos System is a full-stack personal resource planning (PRP) application de
 
 ---
 
-## 🗺️ System Module Directory
+## System Module Directory
 
 ### 1. Ethos Hub (The Dashboard)
 * **Purpose:** Serves as the high-level command center and data aggregator.
