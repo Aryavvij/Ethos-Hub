@@ -98,7 +98,7 @@ with b1:
         if tasks:
             for tname, tdone in tasks:
                 color = "#76b372" if tdone else "#ff4b4b"
-                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px;'><span style='color:{color};'>{'●' if tdone else '○'}</span> {tname}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px;'><span style='color:{color};'>{'' if tdone else '○'}</span> {tname}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
         st.markdown(" ")
