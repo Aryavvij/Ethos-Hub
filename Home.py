@@ -97,8 +97,7 @@ with b1:
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
             for tname, tdone in tasks:
-                color = "#76b372" if tdone else "#ff4b4b"
-                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:{color};'>{tname}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:white;'>{tname}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
         st.markdown(" ")
@@ -118,6 +117,7 @@ with b2:
                 st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
         else:
             st.caption("No upcoming events.")
+        st.markdown(" ")
 
 with b3:
     with st.container(border=True):
@@ -134,6 +134,7 @@ with b3:
                 st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{int(prog)}%</b>: {desc.upper()}</p>", unsafe_allow_html=True)
         else:
             st.caption("Strategy Map Clear.")
+        st.markdown(" ")
 
 # --- FINANCIAL STATUS ---
 st.markdown("### Financial Status")
