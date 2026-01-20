@@ -121,16 +121,23 @@ if not valid_df.empty:
     # REFINED MONTHLY HABIT MATRIX
     st.subheader("Monthly Habit Matrix")
     habit_stats = []
+    
+    # Generate stats only if valid habits exist to prevent KeyError
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
-        done_count = sum(1 for d in day_cols if row[d] == True)
-        pct = (done_count / days_in_month) * 100
-        
-        habit_stats.append({
-            "Habit": name,
-            "Days Completed": str(done_count), 
-            "Monthly Consistency": f"{pct:.1f}%"
-        })
+        if name:
+            done_count = sum(1 for d in day_cols if row[d] == True)
+            pct = (done_count / days_in_month) * 100
+            
+            habit_stats.append({
+                "#": str(i), # String conversion for Left-alignment
+                "Habit": name,
+                "Days Completed": str(done_count), # String conversion for Left-alignment
+                "Monthly Consistency": f"{pct:.1f}%"
+            })
     
-    stats_display_df = pd.DataFrame(habit_stats)
-    st.table(stats_display_df.set_index('#'))
+    if habit_stats:
+        stats_display_df = pd.DataFrame(habit_stats)
+        st.table(stats_display_df.set_index('#'))
+    else:
+        st.info("Log and Synchronize habits to view the Performance Matrix.")
