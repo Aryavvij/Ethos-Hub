@@ -1,6 +1,6 @@
 # Ethos Hub: Integrated Life Operating System
 
-## 🎯 The Purpose: The "All-in-One" Life Operating System
+## The Purpose: The "All-in-One" Life Operating System
 The **Ethos System** was engineered to eliminate **App Fatigue** and **Data Fragmentation**. Most people lose time and mental energy toggling between separate apps for fitness, finance, tasks, and notes. This system consolidates those silos into a single, high-performance ecosystem.
 
 ### 1. Centralized Efficiency
@@ -16,8 +16,7 @@ The UI is optimized for speed. Through **Custom SVG Progress Rings** and **Synch
 
 ---
 
-## 🛠️ Technical Implementation Summary
-*Written in Third Person*
+## Technical Implementation Summary
 
 * **Relational Database Integrity:** Powered by a **PostgreSQL** backend. The developer implemented a normalized schema that supports multi-user partitioning through unique identifier keys, ensuring data persistence and secure concurrent sessions.
 * **Stateful Multi-Page Routing:** Leveraging **Streamlit’s session state**, the developer engineered a secure authentication layer (SHA-256) and a persistent global sidebar, maintaining user identity across nine independent modules.
@@ -27,7 +26,7 @@ The UI is optimized for speed. Through **Custom SVG Progress Rings** and **Synch
 
 ---
 
-## 🗺️ System Module Directory
+## System Module Directory
 
 ### 1. Ethos Hub (The Dashboard)
 * **Purpose:** Serves as the high-level command center and data aggregator.
