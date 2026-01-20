@@ -19,6 +19,21 @@ user = st.session_state.user_email
 st.title("🏋️ Iron Clad")
 st.caption("Performance Analytics & Progressive Overload Tracking")
 
+# --- CUSTOM CSS FOR ETHOS GREEN BUTTON ---
+st.markdown("""
+    <style>
+    div.stButton > button[kind="primary"] {
+        background-color: #76b372 !important;
+        border-color: #76b372 !important;
+        color: white !important;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #5e8f5b !important;
+        border-color: #5e8f5b !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- VOLUME MOMENTUM GRAPH ---
 volume_raw = fetch_query("""
     SELECT workout_date, SUM(weight * reps * sets) as total_volume 
@@ -61,7 +76,6 @@ else:
 st.markdown("---")
 
 # --- TARGETED MUSCLE GROUP TABLES ---
-# Added 'Abs' to the core muscle groups
 muscle_groups = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Forearms", "Abs"]
 
 all_ex_data = fetch_query("SELECT exercise_name, muscle_group, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
