@@ -16,13 +16,6 @@ render_sidebar()
 
 user = st.session_state.user_email
 
-# SIDEBAR LOGOUT
-with st.sidebar:
-    st.success(f"Logged in: {user}")
-    if st.button("Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.rerun()
-
 st.title("📅 Weekly Timetable")
 st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
 
