@@ -7,7 +7,6 @@ def get_db_connection():
         url = os.environ.get('DATABASE_URL')
         if not url:
             return None
-        # Using a fresh connection for stability on Render
         conn = psycopg2.connect(url, sslmode='require')
         return conn
     except Exception as e:
@@ -21,7 +20,7 @@ def execute_query(query, params=None):
             cur.execute(query, params)
             conn.commit()
     except Exception as e:
-        conn.rollback()  # Critical fix for "Aborted Transaction"
+        conn.rollback()  
         st.error(f"Database Error: {e}")
     finally:
         conn.close()
