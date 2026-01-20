@@ -3,7 +3,7 @@ import pandas as pd
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
-# 1. PAGE CONFIG
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="The Pantheon", page_icon="🏛️")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
@@ -12,11 +12,12 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
+# --- INITIALIZATION ---
 user = st.session_state.user_email
 st.title("The Pantheon")
 st.caption("Universal Knowledge Repository: Structured Rankings & Deep Notes")
 
-# --- 2. DUAL-MODE INPUT SECTION (FIXED ALIGNMENT) ---
+# --- ASSET CREATION CENTER ---
 with st.container(border=True):
     st.subheader("Expand the Pantheon")
     t1, t2 = st.tabs(["Create Ranking Table", "Create Master Note"])
@@ -26,7 +27,6 @@ with st.container(border=True):
         cat_name = c1.text_input("Category Title", placeholder="e.g., Top Tech Stocks", key="new_cat")
         item_name = c2.text_input("Initial Entry", placeholder="e.g., NVIDIA", key="new_item")
         
-        # Spacer to align button with text inputs
         c3.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
         if c3.button("Initialize Table", use_container_width=True):
             if cat_name and item_name:
@@ -38,21 +38,19 @@ with st.container(border=True):
         n1, n2, n3 = st.columns([2, 2, 1])
         note_title = n1.text_input("Note Title", placeholder="e.g., Thesis Observations", key="new_note_title")
         
-        # Spacer to align button with text inputs
         n3.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
         if n3.button("📝 Initialize Note", use_container_width=True):
             if note_title:
-                # We save notes as a special category with a '[NOTE]' prefix
                 execute_query("INSERT INTO rankings (user_email, category, item_name, rank_order) VALUES (%s, %s, %s, %s)",
                               (user, f"[NOTE] {note_title}", "", 0))
                 st.rerun()
 
 st.markdown("---")
 
-# --- 3. SEARCH & FILTER ---
+# --- SEARCH & FILTERING ---
 search_query = st.text_input("🔍 Search Pantheon Assets...", placeholder="Search categories or notes...", key="p_search")
 
-# --- 4. THE UNIFORM GRID ---
+# --- ASSET GRID ENGINE ---
 raw_cats = fetch_query("SELECT DISTINCT category FROM rankings WHERE user_email=%s", (user,))
 all_categories = [row[0] for row in raw_cats]
 
@@ -67,7 +65,7 @@ else:
     cols = st.columns(3)
     for idx, cat in enumerate(categories):
         with cols[idx % 3]:
-            # --- RENDER NOTE MODE ---
+            # --- NOTE RENDERING ---
             if cat.startswith("[NOTE]"):
                 display_title = cat.replace("[NOTE] ", "").upper()
                 st.markdown(f"""
@@ -76,7 +74,6 @@ else:
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Fetch note content (stored in item_name)
                 note_data = fetch_query("SELECT item_name FROM rankings WHERE user_email=%s AND category=%s LIMIT 1", (user, cat))
                 current_text = note_data[0][0] if note_data else ""
                 
@@ -90,7 +87,7 @@ else:
                     execute_query("DELETE FROM rankings WHERE user_email=%s AND category=%s", (user, cat))
                     st.rerun()
 
-            # --- RENDER TABLE MODE ---
+            # --- TABLE RENDERING ---
             else:
                 st.markdown(f"""
                     <div style="background:#76b372; padding:5px 15px; border-radius:5px 5px 0 0; color:white; font-weight:bold; margin-bottom:-5px;">
