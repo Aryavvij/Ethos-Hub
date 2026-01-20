@@ -121,8 +121,6 @@ if not valid_df.empty:
     # REFINED MONTHLY HABIT MATRIX
     st.subheader("Monthly Habit Matrix")
     habit_stats = []
-    
-    # Generate stats only if valid habits exist to prevent KeyError
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
         if name:
@@ -130,9 +128,9 @@ if not valid_df.empty:
             pct = (done_count / days_in_month) * 100
             
             habit_stats.append({
-                "#": str(i), # String conversion for Left-alignment
+                "#": str(i), 
                 "Habit": name,
-                "Days Completed": str(done_count), # String conversion for Left-alignment
+                "Days Completed": str(done_count), 
                 "Monthly Consistency": f"{pct:.1f}%"
             })
     
