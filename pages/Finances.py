@@ -6,6 +6,7 @@ from database import execute_query, fetch_query
 from datetime import datetime
 from utils import render_sidebar
 
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Finances")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
@@ -14,12 +15,12 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
+# --- INITIALIZATION ---
 user = st.session_state.user_email
 today = datetime.now()
-
 st.title("Financial Hub")
 
-# --- MONTH SELECTOR ---
+# --- PERIOD SELECTOR ---
 c1, c2 = st.columns([2, 1])
 with c1:
     month_names = list(calendar.month_name)[1:] 
@@ -29,7 +30,7 @@ with c2:
 
 period = f"{selected_month_name} {selected_year}"
 
-# --- BUDGET TABLE ---
+# --- BUDGET MANAGEMENT ---
 st.subheader(f"Budget for {period}")
 raw_budget = fetch_query("SELECT category, plan, actual FROM finances WHERE user_email=%s AND period=%s", (user, period))
 budget_df = pd.DataFrame(raw_budget, columns=["Category", "Planned", "Actual"])
@@ -50,7 +51,7 @@ if st.button("Save Budget Changes", use_container_width=True):
 
 st.markdown("---")
 
-# --- PIE CHART & DEBT (Side by Side) ---
+# --- ANALYTICS & DEBT TRACKING ---
 col1, col2 = st.columns([1, 1], gap="large")
 
 with col1:
@@ -63,7 +64,6 @@ with col1:
 
 with col2:
     st.subheader("Debt Tracking")
-    # Updated Query for Category, Amount, Paid Out
     raw_debt = fetch_query("SELECT category, amount, paid_out FROM debt WHERE user_email=%s", (user,))
     debt_df = pd.DataFrame(raw_debt, columns=["Category", "Debt Amount", "Paid Out"])
     
