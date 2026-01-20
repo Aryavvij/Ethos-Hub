@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from database import execute_query, fetch_query
+from utils import render_sidebar
 
 # 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="Blueprint", page_icon="🗺️")
@@ -11,7 +12,9 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.stop()
 
 user = st.session_state.user_email
-st.title("🗺️ Strategic Blueprint")
+st.title("🗺️ Strategic Blueprint"
+
+render_sidebar()
 
 # --- 2. DATA ENGINE ---
 raw_data = fetch_query("SELECT task_description, category, timeframe, priority, progress FROM future_tasks WHERE user_email=%s", (user,))
