@@ -16,21 +16,6 @@ render_sidebar()
 
 user = st.session_state.user_email
 
-# --- 2. GLOBAL SYMMETRICAL SIDEBAR ---
-with st.sidebar:
-    st.markdown(f"""
-        <div style="background: rgba(118, 179, 114, 0.1); padding: 15px; border-radius: 8px; 
-                    border: 1px solid #76b372; margin-bottom: 10px; text-align: center;">
-            <p style="margin:0; font-size:10px; color:#76b372; font-weight:bold; letter-spacing:1px;">IDENTITY</p>
-            <p style="margin:0; font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis;">{user}</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    if st.button("TERMINATE SESSION", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_email = None
-        st.rerun()
-
 st.title("🏋️ Iron Clad")
 
 # --- 3. VOLUME MOMENTUM GRAPH ---
