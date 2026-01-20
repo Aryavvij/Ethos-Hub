@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
+# --- CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Ethos Hub")
 
 def make_hashes(password):
@@ -88,25 +89,30 @@ w_start = t_date - timedelta(days=d_idx)
 
 b1, b2, b3 = st.columns(3)
 
+# Professional UI Label Style
+label_style = "margin:0; font-size:13px; color:gray; line-height:1.2; font-weight:500; text-transform:uppercase; letter-spacing:0.5px;"
+
 with b1:
     with st.container(border=True):
-        st.markdown("**Today's Tasks**")
+        st.markdown(f"<p style='{label_style}'>Today's Tasks</p>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
             for tname, tdone in tasks:
                 color = "#76b372" if tdone else "#ff4b4b"
-                st.markdown(f"<span style='color:{color};'>{'●' if tdone else '○'}</span> {tname}", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px;'><span style='color:{color};'>{'●' if tdone else '○'}</span> {tname}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
 
 with b2:
     with st.container(border=True):
-        st.markdown('**Upcoming Events**')
+        st.markdown(f"<p style='{label_style}'>Training</p>", unsafe_allow_html=True)
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
-        st.markdown(f"<p style='margin:0; font-size:14px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#76b372; font-weight:bold; margin:2px 0 12px 0; font-size:18px;'>{split_name}</p>", unsafe_allow_html=True)
         
-        st.markdown("<p style='margin:0; font-size:14px; color:gray;'>CALENDAR</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Calendar</p>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:5px;'></div>", unsafe_allow_html=True)
         events = fetch_query("""
             SELECT description, event_date FROM events 
             WHERE user_email=%s AND event_date >= %s 
@@ -115,15 +121,14 @@ with b2:
         
         if events:
             for desc, edate in events:
-                date_str = edate.strftime("%b %d")
-                st.markdown(f"**{date_str}**: {desc}")
+                st.markdown(f"<p style='margin:0 0 2px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
         else:
             st.caption("No upcoming events.")
 
 with b3:
     with st.container(border=True):
-        st.markdown('**Academic Overview**')
-        st.markdown("<p style='margin:0; font-size:14px; color:gray;'>Trajectory</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Trajectory</p>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:5px;'></div>", unsafe_allow_html=True)
         blueprint_tasks = fetch_query("""
             SELECT task_description, progress FROM future_tasks 
             WHERE user_email=%s AND progress < 100 
@@ -132,15 +137,15 @@ with b3:
         
         if blueprint_tasks:
             for desc, prog in blueprint_tasks:
-                st.markdown(f"**{prog}%**: {desc.upper()}")
+                st.markdown(f"<p style='margin:0 0 2px 0; font-size:14px;'><b>{int(prog)}%</b>: {desc.upper()}</p>", unsafe_allow_html=True)
         else:
             st.caption("Strategy Map Clear.")
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("<p style='margin:0; font-size:14px; color:gray;'>Today's Focus</p>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:15px;'></div>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Today's Focus</p>", unsafe_allow_html=True)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
-        st.markdown(f"<h3 style='color:#76b372; margin:0;'>{mins} mins</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h2 style='color:#76b372; margin:0;'>{int(mins)} mins</h2>", unsafe_allow_html=True)
 
 # --- FINANCIAL STATUS ---
 st.markdown("### Financial Status")
