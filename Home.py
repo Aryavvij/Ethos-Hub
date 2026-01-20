@@ -101,6 +101,7 @@ with b1:
                 st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px;'><span style='color:{color};'>{'●' if tdone else '○'}</span> {tname}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
+        st.markdown(" ")
 
 with b2:
     with st.container(border=True):
@@ -117,6 +118,7 @@ with b2:
                 st.markdown(f"<p style='margin:0 0 2px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
         else:
             st.caption("No upcoming events.")
+        st.markdown(" ")
 
 with b3:
     with st.container(border=True):
