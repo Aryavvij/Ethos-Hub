@@ -138,9 +138,11 @@ if not valid_df.empty:
         cols = st.columns(3)
         for idx, stat in enumerate(habit_stats):
             with cols[idx % 3]:
+                # Card UI: Removed border and border-left color. 
+                # Using a slightly higher opacity background for definition.
                 st.markdown(f"""
-                    <div style="border: 2px solid {ethos_green}; border-radius: 10px; padding: 15px; 
-                                background: rgba(255,255,255,0.03); margin-bottom: 15px;">
+                    <div style="border: none; border-radius: 10px; padding: 20px; 
+                                background: rgba(255,255,255,0.05); margin-bottom: 15px;">
                         <p style="margin:0; font-size:11px; color:gray; text-transform:uppercase; letter-spacing:1px;">Habit #{stat["#"]}</p>
                         <h3 style="margin:5px 0 15px 0; color:white; font-size:18px;">{stat["Habit"]}</h3>
                         <div style="display:flex; justify-content:space-between; align-items:flex-end;">
