@@ -118,10 +118,12 @@ if not valid_df.empty:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # MODERNIZED MONTHLY HABIT MATRIX (CARD VIEW)
+    # MODERNIZED MONTHLY HABIT MATRIX (CARD VIEW - ETHOS GREEN)
     st.subheader("Monthly Performance Overview")
     
     habit_stats = []
+    ethos_green = "#76b372" # Standardized Ethos Green
+
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
         if name:
@@ -138,12 +140,9 @@ if not valid_df.empty:
         cols = st.columns(3)
         for idx, stat in enumerate(habit_stats):
             with cols[idx % 3]:
-                # Dynamic Color Coding
-                color = "#76b372" if stat["Consistency"] >= 80 else "#ffab40" if stat["Consistency"] >= 50 else "#ff4b4b"
-                
                 st.markdown(f"""
-                    <div style="border: 1px solid #333; border-radius: 10px; padding: 15px; 
-                                background: rgba(255,255,255,0.03); margin-bottom: 15px; border-left: 5px solid {color};">
+                    <div style="border: 2px solid {ethos_green}; border-radius: 10px; padding: 15px; 
+                                background: rgba(255,255,255,0.03); margin-bottom: 15px;">
                         <p style="margin:0; font-size:11px; color:gray; text-transform:uppercase; letter-spacing:1px;">Habit #{stat["#"]}</p>
                         <h3 style="margin:5px 0 15px 0; color:white; font-size:18px;">{stat["Habit"]}</h3>
                         <div style="display:flex; justify-content:space-between; align-items:flex-end;">
@@ -153,7 +152,7 @@ if not valid_df.empty:
                             </div>
                             <div style="text-align:right;">
                                 <p style="margin:0; font-size:10px; color:gray;">CONSISTENCY</p>
-                                <p style="margin:0; font-weight:bold; font-size:22px; color:{color};">{stat["Consistency"]:.1f}%</p>
+                                <p style="margin:0; font-weight:bold; font-size:22px; color:{ethos_green};">{stat["Consistency"]:.1f}%</p>
                             </div>
                         </div>
                     </div>
