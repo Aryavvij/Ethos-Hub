@@ -2,6 +2,7 @@ import streamlit as st
 import hashlib
 from datetime import datetime, timedelta  
 from database import execute_query, fetch_query
+from utils import render_sidebar
 
 # 1. SET WIDE MODE
 st.set_page_config(layout="wide", page_title="Ethos Hub")
@@ -45,10 +46,7 @@ if not st.session_state.logged_in:
 
 # --- HOME DASHBOARD ---
 user = st.session_state.user_email
-st.sidebar.success(f"User: {user}")
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.rerun()
+render_sidebar()
 
 st.title("ETHOS HUB")
 
