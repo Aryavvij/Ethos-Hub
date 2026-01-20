@@ -1,0 +1,32 @@
+Technical Operations Manual
+  
+A page-by-page breakdown of how the Ethos Hub system functions.
+
+1. Home (Ethos Hub)
+
+Purpose: The central nervous system. It aggregates high-level data from every other module.
+Mechanics: Uses complex SQL JOIN and SUM queries to provide a real-time "Snapshot" of your life. It pulls your focus minutes from Neural Lock, your trajectory from Academic Trajectory, and your cash flow from the Finance Hub.
+Key Feature: The Three-Box Briefing. It uses logic to filter tasks specifically for "Today" based on the current date and day index.
+
+2. Iron Clad (Performance Lab)
+
+Purpose: Track physical progressive overload.
+Mechanics: Uses a "Library/Log" architecture. The exercise_library stores your Personal Bests, while workout_logs stores every individual set.
+The Graph: Plots Total Volume (Weight×Reps×Sets). This visualizes "Work Capacity" rather than just peak strength.
+
+3. Neural Lock (Deep Work)
+
+Purpose: A high-precision focus timer.
+Mechanics: Uses Python’s time module to calculate elapsed seconds between a session-state "Start" and "Stop."
+Data Persistence: On stop, it converts seconds to minutes and logs them into a relational database, which then fuels the Monthly Momentum area chart.
+
+4. Academic Trajectory (The Blueprint)
+
+Purpose: Strategic long-term project management.
+Mechanics: Uses a Sunburst Visualization to show hierarchical data (Category → Priority → Task).
+Input Logic: Employs a data_editor with strict column configurations (Selectboxes and Progress bars) to ensure data integrity.
+
+5. Habit Lab & Weekly Planner
+
+Purpose: Micro-consistency and execution.
+Mechanics: The Habit Lab uses a dynamic pivot-table logic, turning row-based SQL data into a monthly grid. The Weekly Planner uses CSS-styled SVG "Progress Rings" to give immediate visual feedback on daily completion rates.
