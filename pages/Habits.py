@@ -6,7 +6,7 @@ from datetime import datetime
 import calendar
 from utils import render_sidebar
 
-# 1. PAGE CONFIG
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Habit Lab", page_icon="📈")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
@@ -15,14 +15,14 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
+# --- INITIALIZATION ---
 user = st.session_state.user_email
 st.title("Habit Lab")
 
-# --- 2. THE HARD RESET LOGIC ---
 if 'habit_version' not in st.session_state:
     st.session_state.habit_version = 0
 
-# --- 3. DATE SELECTORS ---
+# --- DATE FILTERS ---
 col_m, col_y = st.columns(2)
 with col_m:
     month_name = st.selectbox("Month", list(calendar.month_name)[1:], index=datetime.now().month-1)
@@ -33,7 +33,7 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- 4. DATA ENGINE (SESSION STATE BRIDGE) ---
+# --- DATA ENGINE ---
 data_key = f"data_{month_num}_{year}_{st.session_state.habit_version}"
 
 if data_key not in st.session_state:
@@ -59,7 +59,7 @@ if data_key not in st.session_state:
     
     st.session_state[data_key] = pd.DataFrame(rows, columns=["Habit Name"] + day_cols)
 
-# --- 5. MAIN EDITOR (INPUT TABLE FIRST) ---
+# --- HABIT GRID EDITOR ---
 with st.container(border=True):
     st.subheader(f"🗓️ {month_name} Grid")
     
@@ -99,35 +99,31 @@ with st.container(border=True):
         st.success(f"Successfully Synchronized {save_count} habits.")
         st.rerun()
 
-# --- 6. PERFORMANCE & MOMENTUM (REORDERED SECTION) ---
+# --- ANALYTICS & MOMENTUM ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 
 if not valid_df.empty:
-    
-    # Pre-calculate stats for both chart and table
     total_habits_count = len(valid_df)
     daily_done = valid_df[day_cols].sum(axis=0).astype(int)
     daily_progress = ((daily_done / total_habits_count) * 100).round(1)
 
-    # A. MOMENTUM CHART (GRAPH SECOND)
     st.subheader("Consistency Momentum")
     chart_data = pd.DataFrame({"Day": [int(d) for d in day_cols], "Completed": daily_done.values})
     fig = px.area(chart_data, x="Day", y="Completed", color_discrete_sequence=['#76b372'], template="plotly_dark")
     fig.update_layout(
-        height=400, margin=dict(l=0, r=0, t=20, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        yaxis=dict(title="Habits Done", range=[0, total_habits_count + 0.2], tickmode='linear', dtick=1, gridcolor="rgba(255,255,255,0.05)"),
-        xaxis=dict(title="Day of Month", tickmode='linear', dtick=5, gridcolor="rgba(255,255,255,0.05)")
+        height=350, margin=dict(l=0, r=0, t=20, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        yaxis=dict(title="Habits Done", range=[0, total_habits_count + 0.2], tickmode='linear', dtick=1),
+        xaxis=dict(title="Day of Month", tickmode='linear', dtick=5)
     )
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # B. PERFORMANCE MATRIX (TABLE THIRD)
+    st.subheader("Performance Matrix")
     stats_df = pd.DataFrame({
         "Progress": [f"{p}%" for p in daily_progress],
         "Done": daily_done.values,
         "Total": [total_habits_count] * days_in_month
     }).T
     stats_df.columns = day_cols
-    st.subheader("Performance Matrix")
     st.dataframe(stats_df, use_container_width=True)
