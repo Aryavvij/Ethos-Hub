@@ -1,110 +1,78 @@
 import streamlit as st
 import pandas as pd
-import json
+import plotly.graph_objects as go
 from database import execute_query, fetch_query
+from datetime import datetime
 
 # 1. PAGE CONFIG
-st.set_page_config(layout="wide", page_title="Iron Clad", page_icon="🛡️")
+st.set_page_config(layout="wide", page_title="Iron Clad", page_icon="🏋️")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in on the Home page.")
+    st.warning("Please log in.")
     st.stop()
 
 user = st.session_state.user_email
-st.title("🛡️ Iron Clad")
-st.caption("Strategic Training Splits")
+st.title("🏋️ Iron Clad: Performance Lab")
 
-# --- 2. DATA PRE-LOADER ---
-saved_splits = fetch_query("SELECT day_name, split_title, exercises_json FROM training_splits WHERE user_email=%s", (user,))
-splits_cache = {row[0]: {"title": row[1], "data": row[2]} for row in saved_splits}
+# --- 2. THE SPLIT SELECTOR ---
+day_name = datetime.now().strftime("%A")
+split_data = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, day_name))
+current_split = split_res[0][0] if split_data else "No Split Assigned"
 
-# --- 3. DYNAMIC DAY SELECTION ---
-st.markdown("### ⚙️ Split Configuration")
-existing_days = list(splits_cache.keys())
-active_days = st.multiselect(
-    "Select your active training days:",
-    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-    default=existing_days if existing_days else ["Monday", "Tuesday", "Wednesday", "Friday"]
-)
+st.subheader(f"Today's Protocol: {current_split.upper()}")
 
-st.markdown("---")
+# --- 3. VOLUME TRACKER (UNIQUE ELEMENT) ---
+# Calculates total weight moved (Weight x Reps x Sets)
+volume_data = fetch_query("""
+    SELECT workout_date, SUM(weight * reps * sets) as total_volume 
+    FROM workout_logs 
+    WHERE user_email=%s 
+    GROUP BY workout_date ORDER BY workout_date DESC LIMIT 7
+""", (user,))
 
-# Dictionary to hold the data frames so we can access them during save
-current_day_data = {}
+if volume_data:
+    v_df = pd.DataFrame(volume_data, columns=["Date", "Volume"])
+    fig = go.Figure(go.Scatter(x=v_df["Date"], y=v_df["Volume"], fill='tozeroy', line_color='#76b372'))
+    fig.update_layout(title="Weekly Volume Load (kg)", height=250, template="plotly_dark", margin=dict(l=0,r=0,t=30,b=0))
+    st.plotly_chart(fig, use_container_width=True)
 
-# --- 4. DYNAMIC TRAINING BLOCKS ---
-for day in active_days:
-    with st.container():
-        col_day, col_desc = st.columns([1, 4])
-        existing_title = splits_cache.get(day, {}).get("title", "")
-        
-        with col_day:
-            st.markdown(f"""
-                <div style="background:#76b372; padding:8px; border-radius:5px; 
-                text-align:center; color:white; font-weight:bold; height:41px; 
-                display:flex; align-items:center; justify-content:center; 
-                text-transform: uppercase; font-size: 13px; border: 1px solid #5a8a56;">
-                    {day}
-                </div>
-            """, unsafe_allow_html=True)
-            
-        with col_desc:
-            st.text_input(
-                f"Focus for {day}", 
-                value=existing_title, 
-                placeholder="Training Focus (e.g., Push / Legs)", 
-                key=f"title_{day}", 
-                label_visibility="collapsed"
-            )
-
-        # Load existing table data
-        existing_json = splits_cache.get(day, {}).get("data", None)
-        if existing_json:
-            try:
-                base_df = pd.read_json(existing_json)
-            except:
-                base_df = pd.DataFrame(columns=["Exercise", "Weight (kg)", "Sets", "Reps"])
-        else:
-            base_df = pd.DataFrame(columns=["Exercise", "Weight (kg)", "Sets", "Reps"])
-        
-        # FIX: Assign the result of st.data_editor to a variable directly
-        current_day_data[day] = st.data_editor(
-            base_df,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"editor_{day}",
-            column_config={
-                "Weight (kg)": st.column_config.NumberColumn("Weight", min_value=0),
-                "Sets": st.column_config.NumberColumn("Sets", min_value=0),
-                "Reps": st.column_config.NumberColumn("Reps", min_value=0),
-            }
-        )
-        st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
-
-# --- 5. GLOBAL SYNC ---
-if st.button("🚀 Synchronize Weekly Training Plan", use_container_width=True):
-    # Cleanup removed days
-    all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    removed_days = [d for d in all_days if d not in active_days]
-    for d in removed_days:
-        execute_query("DELETE FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d))
-
-    # Save active days
-    for day in active_days:
-        title_to_save = st.session_state.get(f"title_{day}", "")
-        
-        # FIX: Access the DataFrame from our current_day_data dictionary
-        df_to_save = current_day_data.get(day)
-        
-        # Now .empty will work because df_to_save is a real Pandas DataFrame
-        json_data = df_to_save.to_json() if df_to_save is not None and not df_to_save.empty else None
-        
-        execute_query("""
-            INSERT INTO training_splits (user_email, day_name, split_title, exercises_json) 
-            VALUES (%s, %s, %s, %s) 
-            ON CONFLICT (user_email, day_name) 
-            DO UPDATE SET split_title = EXCLUDED.split_title, exercises_json = EXCLUDED.exercises_json
-        """, (user, day, title_to_save, json_data))
+# --- 4. THE EXERCISE LAB (2-COLUMN TABLE STYLE) ---
+with st.container(border=True):
+    st.subheader("🔥 Execution Log")
     
-    st.success("Training Protocol Synchronized.")
-    st.rerun()
+    # We use a Dynamic Editor for the actual workout
+    # Column 1: Exercise Name | Column 2: Weight | Column 3: Sets/Reps
+    ex_data = fetch_query("SELECT exercise_name, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
+    df = pd.DataFrame(ex_data, columns=["Exercise", "Last Weight", "Last Reps"])
+    
+    # Adding a 'Today's Weight' and 'Today's Reps' column
+    df["Sets"] = 0
+    df["Weight"] = 0.0
+    df["Reps"] = 0
+    
+    edited_df = st.data_editor(
+        df, 
+        use_container_width=True, 
+        num_rows="dynamic",
+        column_config={
+            "Exercise": st.column_config.TextColumn("Exercise", required=True),
+            "Weight": st.column_config.NumberColumn("Kg", format="%.1f"),
+            "Last Weight": st.column_config.NumberColumn("Prev Kg", disabled=True)
+        }
+    )
+
+    if st.button("💾 Log Workout & Update PBs", use_container_width=True):
+        for _, row in edited_df.iterrows():
+            if row["Weight"] > 0:
+                # 1. Log to history
+                execute_query(
+                    "INSERT INTO workout_logs (user_email, exercise_name, weight, reps, sets, workout_date) VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)",
+                    (user, row["Exercise"], row["Weight"], row["Reps"], row["Sets"])
+                )
+                # 2. Update Library for "Last Weight" context
+                execute_query(
+                    "UPDATE exercise_library SET last_weight=%s, last_reps=%s WHERE user_email=%s AND exercise_name=%s",
+                    (row["Weight"], row["Reps"], user, row["Exercise"])
+                )
+        st.success("Volume data committed to the Lab.")
+        st.rerun()
