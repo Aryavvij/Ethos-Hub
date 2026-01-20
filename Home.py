@@ -4,17 +4,15 @@ from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
-# 1. SET WIDE MODE
 st.set_page_config(layout="wide", page_title="Ethos Hub")
 
-# --- AUTH UTILS ---
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- AUTHENTICATION UI ---
+# --- AUTHENTICATION SECTION ---
 if not st.session_state.logged_in:
     st.title("Ethos System Login")
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
@@ -44,13 +42,13 @@ if not st.session_state.logged_in:
                 st.error("Email already exists.")
     st.stop() 
 
-# --- HOME DASHBOARD ---
+# --- DASHBOARD INITIALIZATION ---
 user = st.session_state.user_email
 render_sidebar()
 
 st.title("ETHOS HUB")
 
-# 1. STRATEGIC SEMESTER GOALS
+# --- STRATEGIC SEMESTER GOALS ---
 st.markdown("### Strategic Personal Goals")
 res = fetch_query("SELECT academic, health, personal FROM semester_goals WHERE user_email=%s", (user,))
 g_acad, g_health, g_pers = res[0] if res else ("", "", "")
@@ -80,7 +78,7 @@ if st.button("Update Goals", use_container_width=True):
 
 st.markdown("---")
 
-# --- 2. THE 3-BOX INTEGRATED COMMAND CENTER ---
+# --- DAILY BRIEFING CENTER ---
 st.markdown("### Today's Briefing")
 
 t_date = datetime.now().date()
@@ -88,10 +86,8 @@ d_name = t_date.strftime("%A")
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
-# Refactored to 3 columns
 b1, b2, b3 = st.columns(3)
 
-# BOX 1: DAILY TASKS
 with b1:
     with st.container(border=True):
         st.markdown("**Today's Tasks**")
@@ -99,27 +95,22 @@ with b1:
         if tasks:
             for tname, tdone in tasks:
                 color = "#76b372" if tdone else "#ff4b4b"
-                st.markdown(f"<span style='color:{color};'>{'●●' if tdone else '○'}</span> {tname}", unsafe_allow_html=True)
+                st.markdown(f"<span style='color:{color};'>{'●' if tdone else '○'}</span> {tname}", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
 
-# BOX 2: INTELLIGENCE & EVENTS
 with b2:
     with st.container(border=True):
         st.markdown('**Upcoming Events**')
-        # Training Split
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
         st.markdown(f"<p style='margin:0; font-size:14px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
         
-        # Upcoming Events
         st.markdown("<p style='margin:0; font-size:14px; color:gray;'>CALENDAR</p>", unsafe_allow_html=True)
         events = fetch_query("""
-            SELECT description, event_date 
-            FROM events 
+            SELECT description, event_date FROM events 
             WHERE user_email=%s AND event_date >= %s 
-            ORDER BY event_date ASC 
-            LIMIT 3
+            ORDER BY event_date ASC LIMIT 3
         """, (user, t_date))
         
         if events:
@@ -129,19 +120,14 @@ with b2:
         else:
             st.caption("No upcoming events.")
 
-# BOX 3: STRATEGY & INTELLECT (UPDATED TO SHOW 3 BLUEPRINT TASKS)
 with b3:
     with st.container(border=True):
         st.markdown('**Academic Overview**')
-        
-        # Fetch 3 most upcoming (highest progress) blueprint tasks
         st.markdown("<p style='margin:0; font-size:14px; color:gray;'>Trajectory</p>", unsafe_allow_html=True)
         blueprint_tasks = fetch_query("""
-            SELECT task_description, progress 
-            FROM future_tasks 
+            SELECT task_description, progress FROM future_tasks 
             WHERE user_email=%s AND progress < 100 
-            ORDER BY progress DESC 
-            LIMIT 3
+            ORDER BY progress DESC LIMIT 3
         """, (user,))
         
         if blueprint_tasks:
@@ -150,12 +136,13 @@ with b3:
         else:
             st.caption("Strategy Map Clear.")
         
-        # Focus Time (Neural Lock)
-        st.markdown("<p style='margin:0; font-size:14px; color:gray;'>Today's Focus", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<p style='margin:0; font-size:14px; color:gray;'>Today's Focus</p>", unsafe_allow_html=True)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
+        st.markdown(f"<h3 style='color:#76b372; margin:0;'>{mins} mins</h3>", unsafe_allow_html=True)
 
-# 3. FINANCIAL OVERVIEW
+# --- FINANCIAL STATUS ---
 st.markdown("### Financial Status")
 f1, f2 = st.columns(2)
 period = t_date.strftime("%B %Y")
