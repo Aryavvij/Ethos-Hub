@@ -2,12 +2,15 @@ import streamlit as st
 import calendar
 from datetime import datetime
 from database import execute_query, fetch_query
+from utils import render_sidebar
 
 st.set_page_config(layout="wide", page_title="Monthly Events")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Access Denied.")
     st.stop()
+
+render_sidebar()
 
 user = st.session_state.user_email
 
