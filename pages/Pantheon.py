@@ -13,13 +13,13 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 render_sidebar()
 
 user = st.session_state.user_email
-st.title("🏆 The Pantheon")
+st.title("The Pantheon")
 st.caption("Universal Knowledge Repository: Structured Rankings & Deep Notes")
 
 # --- 2. DUAL-MODE INPUT SECTION (FIXED ALIGNMENT) ---
 with st.container(border=True):
     st.subheader("Expand the Pantheon")
-    t1, t2 = st.tabs(["📊 Create Ranking Table", "📝 Create Master Note"])
+    t1, t2 = st.tabs(["Create Ranking Table", "Create Master Note"])
     
     with t1:
         c1, c2, c3 = st.columns([2, 2, 1])
@@ -28,7 +28,7 @@ with st.container(border=True):
         
         # Spacer to align button with text inputs
         c3.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
-        if c3.button("➕ Initialize Table", use_container_width=True):
+        if c3.button("Initialize Table", use_container_width=True):
             if cat_name and item_name:
                 execute_query("INSERT INTO rankings (user_email, category, item_name, rank_order) VALUES (%s, %s, %s, %s)",
                               (user, cat_name, item_name, 0))
