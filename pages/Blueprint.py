@@ -4,7 +4,7 @@ import plotly.express as px
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
-# 1. PAGE CONFIG
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Blueprint", page_icon="🗺️")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
@@ -16,12 +16,11 @@ render_sidebar()
 user = st.session_state.user_email
 st.title("Academic Trajectory")
 
-
-# --- 2. DATA ENGINE ---
+# --- DATA ENGINE ---
 raw_data = fetch_query("SELECT task_description, category, timeframe, priority, progress FROM future_tasks WHERE user_email=%s", (user,))
 df = pd.DataFrame(raw_data, columns=["Description", "Category", "Timeframe", "Priority", "Progress"])
 
-# --- 3. OVERVIEW METRICS (UPDATED TO 1 DECIMAL PLACE) ---
+# --- OVERVIEW METRICS ---
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.metric("Total Initiatives", len(df))
@@ -30,7 +29,6 @@ with m2:
     st.metric("High Priority", high_prio)
 with m3:
     avg_prog = df["Progress"].mean() if not df.empty else 0
-    # FIX: Metric now shows one decimal point
     st.metric("Avg. Completion", f"{avg_prog:.1f}%")
 with m4:
     ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
@@ -38,12 +36,10 @@ with m4:
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
-# --- 4. THE STRATEGY BRIDGE (FIXED: 1 DECIMAL POINT AVERAGING) ---
+# --- STRATEGY VISUALIZATION ---
 st.subheader("Strategic Progress Mapping")
 if not df.empty:
     chart_df = df.copy()
-    
-    # 1. Calculate Global Averages
     cat_avg = chart_df.groupby('Category')['Progress'].mean().to_dict()
     global_prio_avg = chart_df.groupby('Priority')['Progress'].mean().to_dict()
     
@@ -55,24 +51,17 @@ if not df.empty:
         color_discrete_sequence=px.colors.qualitative.Bold
     )
 
-    # 2. Logic to update labels with 1 decimal point formatting
     new_labels = []
     for i, label in enumerate(fig.data[0].labels):
         parent = fig.data[0].parents[i]
         
-        # CATEGORY LEVEL (Inner Ring)
         if label in cat_avg and parent == "":
             val = cat_avg[label]
             new_labels.append(f"<b>{label.upper()}</b><br>{val:.1f}%")
-        
-        # PRIORITY LEVEL (Middle Ring - GLOBAL AVERAGE)
         elif label in ["High", "Medium", "Low"]:
             val = global_prio_avg.get(label, 0)
             new_labels.append(f"<b>{label}</b><br>{val:.1f}%")
-            
-        # DESCRIPTION LEVEL (Outer Ring)
         else:
-            # For specific leaves, show the decimal if it exists
             val = float(fig.data[0].values[i])
             new_labels.append(f"<b>{label.upper()}</b><br>{val:.1f}%")
 
@@ -91,7 +80,7 @@ else:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 5. SYSTEM MASTER TABLE ---
+# --- SYSTEM MASTER TABLE ---
 st.subheader("Task Input Table")
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
 filter_choice = st.selectbox("Filter View by Timeframe", options=time_options)
@@ -108,7 +97,7 @@ edited_df = st.data_editor(
             "Progress %",
             min_value=0,
             max_value=100,
-            step=0.1, # Allows you to enter decimals manually too
+            step=0.1,
             format="%.1f%%"
         ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
@@ -117,6 +106,7 @@ edited_df = st.data_editor(
     }
 )
 
+# --- DATA SYNCHRONIZATION ---
 if st.button("Synchronize Tasks Blueprint", use_container_width=True):
     execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
     for _, row in edited_df.iterrows():
