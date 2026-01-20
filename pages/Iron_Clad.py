@@ -61,7 +61,8 @@ else:
 st.markdown("---")
 
 # --- TARGETED MUSCLE GROUP TABLES ---
-muscle_groups = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Forearms"]
+# Added 'Abs' to the core muscle groups
+muscle_groups = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Forearms", "Abs"]
 
 all_ex_data = fetch_query("SELECT exercise_name, muscle_group, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
 all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "Prev Reps"])
@@ -69,11 +70,11 @@ all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "
 updated_sessions = []
 
 for group in muscle_groups:
-    with st.expander(f"➔ {group.upper()} Progress", expanded=True):
+    with st.expander(f"➔ {group.upper()} Progress", expanded=(group == "Abs")):
         group_df = all_ex_df[all_ex_df["Group"] == group].copy()
         
         if group_df.empty:
-            st.caption(f"No {group} exercises. Add one to start tracking.")
+            st.caption(f"No {group} exercises found. Add your routine below.")
             group_df = pd.DataFrame([{"Exercise": "", "Sets": 0, "Weight": 0.0, "Reps": 0, "Prev Kg": 0.0, "Prev Reps": 0}])
         else:
             group_df["Sets"] = 0
@@ -89,7 +90,9 @@ for group in muscle_groups:
             column_config={
                 "Prev Kg": st.column_config.NumberColumn("Prev Kg", disabled=True, format="%.1f"),
                 "Prev Reps": st.column_config.NumberColumn("Prev Reps", disabled=True),
-                "Weight": st.column_config.NumberColumn("Today's Kg", format="%.1f", min_value=0.0)
+                "Weight": st.column_config.NumberColumn("Today's Kg", format="%.1f", min_value=0.0),
+                "Sets": st.column_config.NumberColumn("Sets", min_value=0),
+                "Reps": st.column_config.NumberColumn("Reps", min_value=0)
             }
         )
         updated_sessions.append((group, edited))
@@ -99,7 +102,7 @@ if st.button("💾 COMMIT ENTIRE SESSION", use_container_width=True, type="prima
     total_logged = 0
     for group, df in updated_sessions:
         for _, row in df.iterrows():
-            if row["Weight"] > 0 and row["Exercise"]:
+            if row["Exercise"] and (row["Weight"] > 0 or row["Reps"] > 0):
                 execute_query("""
                     INSERT INTO workout_logs (user_email, exercise_name, weight, reps, sets, workout_date) 
                     VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)
