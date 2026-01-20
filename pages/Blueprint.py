@@ -14,7 +14,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 render_sidebar()
 
 user = st.session_state.user_email
-st.title("🗺️ Strategic Blueprint")
+st.title("Academic Trajectory")
 
 
 # --- 2. DATA ENGINE ---
@@ -34,12 +34,12 @@ with m3:
     st.metric("Avg. Completion", f"{avg_prog:.1f}%")
 with m4:
     ready = len(df[df["Progress"] >= 80]) if not df.empty else 0
-    st.metric("Ready to Deploy", ready)
+    st.metric("Almost Finished", ready)
 
 st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
 
 # --- 4. THE STRATEGY BRIDGE (FIXED: 1 DECIMAL POINT AVERAGING) ---
-st.subheader("Strategic Resource Mapping")
+st.subheader("Strategic Progress Mapping")
 if not df.empty:
     chart_df = df.copy()
     
@@ -92,9 +92,9 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- 5. SYSTEM MASTER TABLE ---
-st.subheader("System Master Table")
+st.subheader("Task Input Table")
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
-filter_choice = st.selectbox("🎯 Filter View by Timeframe", options=time_options)
+filter_choice = st.selectbox("Filter View by Timeframe", options=time_options)
 
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
 
@@ -105,7 +105,7 @@ edited_df = st.data_editor(
     key="blueprint_decimal_v1",
     column_config={
         "Progress": st.column_config.NumberColumn(
-            "Manual %",
+            "Progress %",
             min_value=0,
             max_value=100,
             step=0.1, # Allows you to enter decimals manually too
@@ -117,7 +117,7 @@ edited_df = st.data_editor(
     }
 )
 
-if st.button("Synchronize System Blueprint", use_container_width=True):
+if st.button("Synchronize Tasks Blueprint", use_container_width=True):
     execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
     for _, row in edited_df.iterrows():
         if row["Description"]:
