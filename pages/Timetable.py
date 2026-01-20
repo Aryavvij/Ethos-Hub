@@ -1,6 +1,7 @@
 import streamlit as st
 from database import fetch_query, execute_query
 from datetime import datetime, time
+from utils import render_sidebar
 
 # 1. SET WIDE MODE
 st.set_page_config(layout="wide", page_title="Weekly Timetable")
@@ -10,6 +11,8 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Access Denied. Please log in on the Home page.")
     if st.button("Go to Home"): st.switch_page("Home.py")
     st.stop()
+
+render_sidebar()
 
 user = st.session_state.user_email
 
