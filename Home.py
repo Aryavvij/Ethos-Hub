@@ -51,7 +51,7 @@ render_sidebar()
 st.title("ETHOS HUB")
 
 # 1. STRATEGIC SEMESTER GOALS
-st.markdown("### 🎯 Strategic Personal Goals")
+st.markdown("### Strategic Personal Goals")
 res = fetch_query("SELECT academic, health, personal FROM semester_goals WHERE user_email=%s", (user,))
 g_acad, g_health, g_pers = res[0] if res else ("", "", "")
 
@@ -99,7 +99,7 @@ with b1:
         if tasks:
             for tname, tdone in tasks:
                 color = "#76b372" if tdone else "#ff4b4b"
-                st.markdown(f"<span style='color:{color};'>{'●' if tdone else '○'}</span> {tname}", unsafe_allow_html=True)
+                st.markdown(f"<span style='color:{color};'>{'●●' if tdone else '○'}</span> {tname}", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
 
@@ -110,7 +110,7 @@ with b2:
         # Training Split
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
-        st.markdown(f"<p style='margin:0; font-size:12px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='margin:0; font-size:18px; color:gray;'>TRAINING</p><p style='color:#76b372; font-weight:bold; margin-bottom:10px;'>{split_name}</p>", unsafe_allow_html=True)
         
         # Upcoming Events
         st.markdown("<p style='margin:0; font-size:12px; color:gray;'>CALENDAR</p>", unsafe_allow_html=True)
@@ -135,7 +135,7 @@ with b3:
         st.markdown('**Academic Overview**')
         
         # Fetch 3 most upcoming (highest progress) blueprint tasks
-        st.markdown("<p style='margin:0; font-size:12px; color:gray;'>Trajectory</p>", unsafe_allow_html=True)
+        st.markdown("<p style='margin:0; font-size:18px; color:gray;'>Trajectory</p>", unsafe_allow_html=True)
         blueprint_tasks = fetch_query("""
             SELECT task_description, progress 
             FROM future_tasks 
@@ -151,9 +151,9 @@ with b3:
             st.caption("Strategy Map Clear.")
         
         # Focus Time (Neural Lock)
+        st.markdown("<p style='margin:0; font-size:18px; color:gray;'>Today's Focus/p>", unsafe_allow_html=True)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
-        st.metric("Focus Today", f"{mins}m")
 
 # 3. FINANCIAL OVERVIEW
 st.markdown("### Financial Status")
