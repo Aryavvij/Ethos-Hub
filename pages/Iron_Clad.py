@@ -12,108 +12,99 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.stop()
 
 user = st.session_state.user_email
-st.title("🏋️ Iron Clad: Performance Lab")
 
-# --- 2. DYNAMIC SPLIT RECOGNITION ---
-day_name = datetime.now().strftime("%A")
-# Check what the user is supposed to train today based on the Training Splits table
-split_data = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, day_name))
-current_split = split_data[0][0] if split_data else "REST DAY"
+# --- 2. GLOBAL SYMMETRICAL SIDEBAR ---
+with st.sidebar:
+    st.markdown(f"""
+        <div style="background: rgba(118, 179, 114, 0.1); padding: 15px; border-radius: 8px; 
+                    border: 1px solid #76b372; margin-bottom: 10px; text-align: center;">
+            <p style="margin:0; font-size:10px; color:#76b372; font-weight:bold; letter-spacing:1px;">IDENTITY</p>
+            <p style="margin:0; font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis;">{user}</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("TERMINATE SESSION", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user_email = None
+        st.rerun()
 
-st.subheader(f"Today's Protocol: {current_split.upper()}")
+st.title("🏋️ Iron Clad")
 
-# --- 3. VOLUME MOMENTUM (The Unique Factor) ---
-# Tracks Total Work Capacity: Weight x Reps x Sets
+# --- 3. VOLUME MOMENTUM GRAPH ---
 volume_raw = fetch_query("""
     SELECT workout_date, SUM(weight * reps * sets) as total_volume 
-    FROM workout_logs 
-    WHERE user_email=%s 
+    FROM workout_logs WHERE user_email=%s 
     GROUP BY workout_date ORDER BY workout_date ASC LIMIT 7
 """, (user,))
 
 if volume_raw:
     v_df = pd.DataFrame(volume_raw, columns=["Date", "Volume"])
-    
-    fig = go.Figure(go.Scatter(
-        x=v_df["Date"], y=v_df["Volume"], 
-        fill='tozeroy', 
-        line_color='#76b372',
-        fillcolor='rgba(118, 179, 114, 0.2)'
-    ))
-    fig.update_layout(
-        title="Weekly Work Capacity (Total Volume kg)",
-        height=250, 
-        template="plotly_dark", 
-        margin=dict(l=10, r=10, t=40, b=10),
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)")
-    )
+    fig = go.Figure(go.Scatter(x=v_df["Date"], y=v_df["Volume"], fill='tozeroy', line_color='#76b372'))
+    fig.update_layout(title="Work Capacity Trend (Total kg moved)", height=200, template="plotly_dark", margin=dict(l=0,r=0,t=30,b=0))
     st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("Log your first workout to see your Volume Momentum.")
 
-# --- 4. THE EXECUTION TABLE (Spreadsheet Style) ---
 st.markdown("---")
-with st.container(border=True):
-    st.subheader("📝 Active Session Log")
-    st.caption("Enter today's stats. 'Prev' columns show your last successful session for reference.")
 
-    # Fetch exercise library to provide context for the workout
-    lib_data = fetch_query("SELECT exercise_name, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
-    
-    if not lib_data:
-        # Initial state for new users
-        df = pd.DataFrame([{"Exercise": "Example: Bench Press", "Sets": 3, "Weight": 60.0, "Reps": 10, "Prev Kg": 0.0, "Prev Reps": 0}])
-    else:
-        rows = []
-        for ex, lw, lr in lib_data:
-            rows.append({
-                "Exercise": ex,
-                "Sets": 0,
-                "Weight": 0.0,
-                "Reps": 0,
-                "Prev Kg": lw if lw else 0.0,
-                "Prev Reps": lr if lr else 0
-            })
-        df = pd.DataFrame(rows)
+# --- 4. TARGETED MUSCLE GROUP TABLES ---
+muscle_groups = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Forearms"]
 
-    # The Grid
-    edited_df = st.data_editor(
-        df,
-        use_container_width=True,
-        num_rows="dynamic",
-        column_config={
-            "Exercise": st.column_config.TextColumn("Exercise", required=True, width="medium"),
-            "Weight": st.column_config.NumberColumn("Today's Kg", format="%.1f", help="Current weight lifted"),
-            "Prev Kg": st.column_config.NumberColumn("Prev Kg", disabled=True, format="%.1f"),
-            "Prev Reps": st.column_config.NumberColumn("Prev Reps", disabled=True)
-        },
-        key="workout_editor"
-    )
+# Fetch all exercises for the user once
+all_ex_data = fetch_query("SELECT exercise_name, muscle_group, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
+all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "Prev Reps"])
 
-    if st.button("💾 Commit Session to Lab", use_container_width=True):
-        valid_entries = 0
-        for _, row in edited_df.iterrows():
-            ex_name = row["Exercise"].strip()
-            if ex_name and row["Weight"] > 0:
-                # 1. Log the History
+# We will store the edited dataframes here to save them all at once
+updated_sessions = []
+
+for group in muscle_groups:
+    with st.expander(f"➔ {group.upper()} PROTOCOL", expanded=True):
+        # Filter exercises for this specific group
+        group_df = all_ex_df[all_ex_df["Group"] == group].copy()
+        
+        if group_df.empty:
+            st.caption(f"No {group} exercises in library. Add one below.")
+            # Dummy row for new input if group is empty
+            group_df = pd.DataFrame([{"Exercise": "", "Sets": 0, "Weight": 0.0, "Reps": 0, "Prev Kg": 0.0, "Prev Reps": 0}])
+        else:
+            group_df["Sets"] = 0
+            group_df["Weight"] = 0.0
+            group_df["Reps"] = 0
+            # Reorder columns for better UX
+            group_df = group_df[["Exercise", "Sets", "Weight", "Reps", "Prev Kg", "Prev Reps"]]
+
+        edited = st.data_editor(
+            group_df,
+            use_container_width=True,
+            num_rows="dynamic",
+            key=f"editor_{group}",
+            column_config={
+                "Prev Kg": st.column_config.NumberColumn("Prev Kg", disabled=True),
+                "Prev Reps": st.column_config.NumberColumn("Prev Reps", disabled=True),
+                "Weight": st.column_config.NumberColumn("Today's Kg", format="%.1f")
+            }
+        )
+        updated_sessions.append((group, edited))
+
+# --- 5. GLOBAL SAVE SYSTEM ---
+if st.button("💾 COMMIT ENTIRE SESSION", use_container_width=True, type="primary"):
+    total_logged = 0
+    for group, df in updated_sessions:
+        for _, row in df.iterrows():
+            if row["Weight"] > 0 and row["Exercise"]:
+                # Log History
                 execute_query("""
                     INSERT INTO workout_logs (user_email, exercise_name, weight, reps, sets, workout_date) 
                     VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)
-                """, (user, ex_name, row["Weight"], row["Reps"], row["Sets"]))
+                """, (user, row["Exercise"], row["Weight"], row["Reps"], row["Sets"]))
                 
-                # 2. Update Library (The context for next time)
+                # Update Library (Upsert)
                 execute_query("""
-                    INSERT INTO exercise_library (user_email, exercise_name, last_weight, last_reps)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO exercise_library (user_email, exercise_name, muscle_group, last_weight, last_reps)
+                    VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (user_email, exercise_name) 
-                    DO UPDATE SET last_weight=EXCLUDED.last_weight, last_reps=EXCLUDED.last_reps
-                """, (user, ex_name, row["Weight"], row["Reps"]))
-                
-                valid_entries += 1
-        
-        if valid_entries > 0:
-            st.success(f"Session Committed. {valid_entries} exercises archived.")
-            st.rerun()
-        else:
-            st.error("Please enter at least one exercise with weight > 0.")
+                    DO UPDATE SET last_weight=EXCLUDED.last_weight, last_reps=EXCLUDED.last_reps, muscle_group=EXCLUDED.muscle_group
+                """, (user, row["Exercise"], group, row["Weight"], row["Reps"]))
+                total_logged += 1
+    
+    if total_logged > 0:
+        st.success(f"Archived {total_logged} exercises. Volume graph updated.")
+        st.rerun()
