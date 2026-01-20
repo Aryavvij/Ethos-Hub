@@ -84,21 +84,19 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.subheader("Task Input Table")
 time_options = ["All", "This Week", "Couple Weeks", "Couple Months", "This Vacation", "This Semester", "1 Year", "Someday", "Maybe"]
 filter_choice = st.selectbox("Filter View by Timeframe", options=time_options)
-
 display_df = df if filter_choice == "All" else df[df["Timeframe"] == filter_choice]
+display_df["Progress"] = display_df["Progress"].apply(lambda x: f"{x:.1f}")
 
 edited_df = st.data_editor(
     display_df,
     num_rows="dynamic",
     use_container_width=True,
-    key="blueprint_decimal_v1",
+    key="blueprint_left_aligned_v1",
     column_config={
-        "Progress": st.column_config.NumberColumn(
+        "Progress": st.column_config.TextColumn(
             "Progress %",
-            min_value=0,
-            max_value=100,
-            step=0.1,
-            format="%.1f%%"
+            help="Enter percentage (e.g., 85.5)",
+            width="small"
         ),
         "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
@@ -111,9 +109,14 @@ if st.button("Synchronize Tasks Blueprint", use_container_width=True):
     execute_query("DELETE FROM future_tasks WHERE user_email=%s", (user,))
     for _, row in edited_df.iterrows():
         if row["Description"]:
+            try:
+                clean_progress = float(str(row["Progress"]).replace('%', ''))
+            except:
+                clean_progress = 0.0
+                
             execute_query(
                 "INSERT INTO future_tasks (user_email, task_description, category, timeframe, priority, progress) VALUES (%s, %s, %s, %s, %s, %s)",
-                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], float(row["Progress"]))
+                (user, row["Description"], row["Category"], row["Timeframe"], row["Priority"], clean_progress)
             )
     st.success("Blueprint Synced.")
     st.rerun()
