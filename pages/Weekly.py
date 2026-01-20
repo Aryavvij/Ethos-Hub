@@ -1,9 +1,12 @@
 import streamlit as st
 from datetime import datetime, timedelta
 from database import execute_query, fetch_query
+from utils import render_sidebar
 
 # 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
+
+render_sidebar()
 
 # --- CSS: ABSOLUTE GRID LOCK ---
 st.markdown("""
