@@ -98,7 +98,7 @@ edited_df = st.data_editor(
             help="Enter percentage (e.g., 85.5)",
             width="small"
         ),
-        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Travel", "Personal"]),
+        "Category": st.column_config.SelectboxColumn(options=["Career", "Financial", "Academic", "Hobby", "Personal"]),
         "Priority": st.column_config.SelectboxColumn(options=["High", "Medium", "Low"]),
         "Timeframe": st.column_config.SelectboxColumn(options=time_options[1:])
     }
