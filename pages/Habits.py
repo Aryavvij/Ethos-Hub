@@ -122,11 +122,19 @@ if not valid_df.empty:
     habit_stats = []
     ethos_green = "#76b372" 
 
+    # UPDATE: Logic for "Till Today" denominator
+    today = datetime.now()
+    if year == today.year and month_num == today.month:
+        denominator = today.day
+    else:
+        denominator = days_in_month
+
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
         if name:
             done_count = sum(1 for d in day_cols if row[d] == True)
-            pct = (done_count / days_in_month) * 100
+            # Calculate % based on elapsed days (denominator)
+            pct = (done_count / denominator) * 100
             habit_stats.append({
                 "#": str(i),
                 "Habit": name,
@@ -138,8 +146,6 @@ if not valid_df.empty:
         cols = st.columns(3)
         for idx, stat in enumerate(habit_stats):
             with cols[idx % 3]:
-                # Card UI: Removed border and border-left color. 
-                # Using a slightly higher opacity background for definition.
                 st.markdown(f"""
                     <div style="border: none; border-radius: 10px; padding: 20px; 
                                 background: rgba(255,255,255,0.05); margin-bottom: 15px;">
