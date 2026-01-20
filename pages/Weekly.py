@@ -3,15 +3,18 @@ from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
-# 1. PAGE CONFIG
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
+
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.warning("Please log in on the Home page.")
+    st.stop()
 
 render_sidebar()
 
-# --- CSS: ABSOLUTE GRID LOCK ---
+# --- CSS STYLING ---
 st.markdown("""
     <style>
-    /* 1. Fix the Column Widths and prevent vertical drifting */
     [data-testid="column"] {
         display: flex;
         flex-direction: column;
@@ -19,8 +22,6 @@ st.markdown("""
         justify-content: flex-start;
         min-width: 0px !important;
     }
-
-    /* 2. Progress Circle: Fixed Space Lock */
     .progress-wrapper {
         width: 100%;
         height: 100px; 
@@ -33,8 +34,6 @@ st.markdown("""
     .circle-bg { fill: none; stroke: #333; stroke-width: 2.8; }
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
-
-    /* 3. TASK ROW: The "Table Row" look */
     .task-row-container {
         display: flex;
         align-items: center;
@@ -45,34 +44,21 @@ st.markdown("""
         border-radius: 4px;
         border: 1px solid #444;
     }
-    
-    /* 4. Input Field Normalization */
-    input {
-        font-size: 12px !important;
-    }
+    input { font-size: 12px !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. SAFETY GATE
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in on the Home page.")
-    st.stop()
-
+# --- INITIALIZATION ---
 user = st.session_state.user_email
-
 st.title("🗓️ Weekly Planner")
-
-# Date Input
 start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
-
-# 3. WEEKLY GRID
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# --- WEEKLY GRID RENDERING ---
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
     this_date = start_date + timedelta(days=i)
-    
-    # FETCH DATA
     tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
                         (user, i, start_date))
     
@@ -88,7 +74,7 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # PROGRESS RING
+        # PROGRESS VISUALIZATION
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -99,7 +85,7 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # ADD TASK SECTION (Single unit to prevent misalignment)
+        # TASK INPUT ENGINE
         with st.container():
             new_task = st.text_input("Add", key=f"in_{i}", label_visibility="collapsed", placeholder="+ Task")
             if st.button("ADD", key=f"btn_{i}", use_container_width=True):
@@ -110,16 +96,9 @@ for i, day_name in enumerate(days):
 
         st.markdown("<hr style='margin:10px 0; border:0.5px solid #333;'>", unsafe_allow_html=True)
         
-        # --- THE TASK LIST ---
+        # TASK EXECUTION LIST
         for tid, tname, tdone in tasks:
-            # We use a single container to hold both text and checkbox to avoid column-splitting bugs
-            status_color = "#76b372" if tdone else "#ff4b4b"
-            
-            # Using Markdown for the name and a checkbox right next to it
-            # To ensure they never split, we place them in a small container
             with st.container(border=True):
-                # We show the name and a checkbox. Clicking the checkbox updates the DB.
-                # Label is the task name to save space
                 if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
                     if not tdone:
                         execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
