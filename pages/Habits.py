@@ -117,12 +117,10 @@ if not valid_df.empty:
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # MODERNIZED MONTHLY HABIT MATRIX (CARD VIEW - ETHOS GREEN)
     st.subheader("Monthly Performance Overview")
     
     habit_stats = []
-    ethos_green = "#76b372" # Standardized Ethos Green
+    ethos_green = "#76b372" 
 
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
