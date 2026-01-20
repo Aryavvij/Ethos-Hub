@@ -6,7 +6,7 @@ from database import execute_query, fetch_query
 from datetime import datetime
 from utils import render_sidebar
 
-# 1. PAGE CONFIG
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Neural Lock", page_icon="🔒")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
@@ -15,16 +15,14 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
+# --- INITIALIZATION ---
 user = st.session_state.user_email
-
-# --- 2. AUTOMATIC DATE RECOGNITION ---
-# This ensures the UI is always aware of the "Now"
 now = datetime.now()
 t_date = now.date()
 st.title("🔒 Neural Lock")
 st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
 
-# --- 3. MONTHLY SELECTOR ENGINE ---
+# --- DATE FILTERS ---
 c_sel1, c_sel2 = st.columns([2, 1])
 with c_sel1:
     month_names = ["January", "February", "March", "April", "May", "June", 
@@ -34,7 +32,7 @@ with c_sel1:
 with c_sel2:
     selected_year = st.selectbox("Year", [2025, 2026, 2027], index=1)
 
-# --- 4. DATA ENGINE (The "Day Recognition" Logic) ---
+# --- DATA ENGINE ---
 monthly_raw = fetch_query("""
     SELECT EXTRACT(DAY FROM session_date) as day, SUM(duration_mins) 
     FROM focus_sessions 
@@ -46,10 +44,9 @@ monthly_raw = fetch_query("""
 
 m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
 
-# --- 5. OVERVIEW METRICS ---
+# --- OVERVIEW METRICS ---
 m1, m2, m3 = st.columns(3)
 with m1:
-    # AUTO-RECOGNITION: Checks if viewing today's month/year
     if month_num == now.month and selected_year == now.year:
         today_mins = m_df[m_df["Day"] == now.day]["Mins"].sum()
         st.metric("Today's Focus", f"{int(today_mins)}m")
@@ -64,7 +61,7 @@ with m3:
     status = "🔴 IDLE" if 'stopwatch_start' not in st.session_state or st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
     st.metric("System Status", status)
 
-# --- 6. MONTHLY MOMENTUM GRAPH ---
+# --- VISUAL MOMENTUM ---
 if not m_df.empty:
     fig_m = px.area(m_df, x="Day", y="Mins", color_discrete_sequence=['#76b372'], template="plotly_dark")
     fig_m.update_layout(
@@ -77,7 +74,7 @@ if not m_df.empty:
 
 st.markdown("---")
 
-# --- 7. THE ENGINE ROOM (STOPWATCH) ---
+# --- FOCUS ENGINE (STOPWATCH) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
 with col_timer:
@@ -104,7 +101,6 @@ with col_timer:
                 st.session_state.stopwatch_start = time.time()
                 st.rerun()
     else:
-        # DATA LOGGING: explicitly uses CURRENT_DATE for recognition
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
@@ -115,7 +111,6 @@ with col_timer:
             st.session_state.stopwatch_start = None
             st.rerun()
 
-        # Stopwatch Display
         elapsed = int(time.time() - st.session_state.stopwatch_start)
         mins, secs = divmod(elapsed, 60)
         timer_placeholder.markdown(f"""
@@ -125,9 +120,9 @@ with col_timer:
             </div>
         """, unsafe_allow_html=True)
 
+# --- SESSION LOG ---
 with col_log:
     st.subheader("Today's Log")
-    # Query recognizes CURRENT_DATE to isolate today's sessions
     today_data = fetch_query("""
         SELECT task_name, duration_mins 
         FROM focus_sessions 
