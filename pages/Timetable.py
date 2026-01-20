@@ -3,10 +3,9 @@ from database import fetch_query, execute_query
 from datetime import datetime, time
 from utils import render_sidebar
 
-# 1. SET WIDE MODE
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Weekly Timetable")
 
-# 2. SAFETY GATE
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Access Denied. Please log in on the Home page.")
     if st.button("Go to Home"): st.switch_page("Home.py")
@@ -14,22 +13,19 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
+# --- INITIALIZATION ---
 user = st.session_state.user_email
-
 st.title("📅 Weekly Timetable")
 st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
-
-# 3. ADD CLASS BAR (Dual iPhone-style Pickers)
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+# --- CLASS SCHEDULER ENGINE ---
 with st.expander("➕ Add Class to Schedule", expanded=False):
-    # Row 1: General Info
     r1c1, r1c2, r1c3 = st.columns([1, 2, 1])
     day_sel = r1c1.selectbox("Day", days)
     sub_sel = r1c2.text_input("Subject", placeholder="e.g. Data Structures")
     loc_sel = r1c3.text_input("Location", placeholder="e.g. AB5-201")
 
-    # Helper function to create the time picker UI
     def time_picker(label_prefix):
         st.write(f"**{label_prefix} Time**")
         p1, p2, p3 = st.columns([1, 1, 1])
@@ -37,7 +33,6 @@ with st.expander("➕ Add Class to Schedule", expanded=False):
         m = p2.selectbox(f"Minute ({label_prefix})", [f"{i:02d}" for i in range(60)], index=0, label_visibility="collapsed")
         period = p3.selectbox(f"AM/PM ({label_prefix})", ["AM", "PM"], index=0, label_visibility="collapsed")
         
-        # Convert to 24h for DB
         h24 = int(h)
         if period == "PM" and h24 != 12: h24 += 12
         if period == "AM" and h24 == 12: h24 = 0
@@ -48,11 +43,7 @@ with st.expander("➕ Add Class to Schedule", expanded=False):
 
     if st.button("Save Class", use_container_width=True):
         if sub_sel:
-            # We store the end time in the 'location' field or you can update your DB schema 
-            # to have an 'end_time' column. For now, I will format it into the display.
-            # NOTE: Highly recommended to add an 'end_time' column to your SQL table.
             time_range_str = f"{start_time_final.strftime('%H:%M')}-{end_time_final.strftime('%H:%M')}"
-            
             execute_query("""
                 INSERT INTO timetable (user_email, day_name, start_time, subject, location) 
                 VALUES (%s, %s, %s, %s, %s)
@@ -63,7 +54,7 @@ with st.expander("➕ Add Class to Schedule", expanded=False):
 
 st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
 
-# 4. TIMETABLE CONTENT
+# --- WEEKLY GRID RENDERING ---
 cols = st.columns(len(days))
 
 for i, day in enumerate(days):
@@ -78,16 +69,13 @@ for i, day in enumerate(days):
         
         for cid, ctime, csub, cloc_raw in day_classes:
             with st.container(border=True):
-                # Parsing the range and location from our combined string
                 try:
                     time_part, loc = cloc_raw.split('|')
                     start_str, end_str = time_part.split('-')
-                    # Format for display: 09:00 AM - 10:50 AM
                     display_start = datetime.strptime(start_str, "%H:%M").strftime("%I:%M %p")
                     display_end = datetime.strptime(end_str, "%H:%M").strftime("%I:%M %p")
                     display_time = f"{display_start} - {display_end}"
                 except:
-                    # Fallback if the data isn't in the new format yet
                     display_time = ctime.strftime('%I:%M %p')
                     loc = cloc_raw
 
