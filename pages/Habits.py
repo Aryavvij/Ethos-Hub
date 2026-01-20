@@ -16,7 +16,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 render_sidebar()
 
 user = st.session_state.user_email
-st.title("📈 Habit Lab")
+st.title("Habit Lab")
 
 # --- 2. THE HARD RESET LOGIC ---
 if 'habit_version' not in st.session_state:
@@ -78,7 +78,7 @@ with st.container(border=True):
         key=f"editor_{data_key}"
     )
 
-    if st.button("💾 Synchronize System", use_container_width=True):
+    if st.button("Synchronize Table", use_container_width=True):
         st.session_state[data_key] = edited_df
         execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
         
@@ -110,7 +110,7 @@ if not valid_df.empty:
     daily_progress = ((daily_done / total_habits_count) * 100).round(1)
 
     # A. MOMENTUM CHART (GRAPH SECOND)
-    st.subheader("🌊 Consistency Momentum")
+    st.subheader("Consistency Momentum")
     chart_data = pd.DataFrame({"Day": [int(d) for d in day_cols], "Completed": daily_done.values})
     fig = px.area(chart_data, x="Day", y="Completed", color_discrete_sequence=['#76b372'], template="plotly_dark")
     fig.update_layout(
@@ -129,5 +129,5 @@ if not valid_df.empty:
         "Total": [total_habits_count] * days_in_month
     }).T
     stats_df.columns = day_cols
-    st.subheader("📊 Performance Matrix")
+    st.subheader("Performance Matrix")
     st.dataframe(stats_df, use_container_width=True)
