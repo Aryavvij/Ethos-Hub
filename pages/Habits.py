@@ -125,10 +125,10 @@ if not valid_df.empty:
         name = row["Habit Name"]
         done_count = sum(1 for d in day_cols if row[d] == True)
         pct = (done_count / days_in_month) * 100
+        
         habit_stats.append({
-            "#": i,
             "Habit": name,
-            "Days Completed": done_count,
+            "Days Completed": str(done_count), 
             "Monthly Consistency": f"{pct:.1f}%"
         })
     
