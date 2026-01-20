@@ -5,22 +5,21 @@ from database import execute_query, fetch_query
 from datetime import datetime
 from utils import render_sidebar
 
-# 1. PAGE CONFIG
+# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Iron Clad", page_icon="🏋️")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
     st.stop()
 
-# Shared Sidebar with symmetrical Gmail ID and Logout
 render_sidebar()
 
+# --- INITIALIZATION ---
 user = st.session_state.user_email
-
 st.title("🏋️ Iron Clad")
 st.caption("Performance Analytics & Progressive Overload Tracking")
 
-# --- 2. VOLUME MOMENTUM GRAPH (FIXED Y-AXIS) ---
+# --- VOLUME MOMENTUM GRAPH ---
 volume_raw = fetch_query("""
     SELECT workout_date, SUM(weight * reps * sets) as total_volume 
     FROM workout_logs WHERE user_email=%s 
@@ -29,8 +28,6 @@ volume_raw = fetch_query("""
 
 if volume_raw:
     v_df = pd.DataFrame(volume_raw, columns=["Date", "Volume"])
-    
-    # Calculate Y-axis Headroom (20% above max volume)
     max_vol = v_df["Volume"].max()
     y_limit = max_vol * 1.2 if max_vol > 0 else 1000
 
@@ -53,7 +50,7 @@ if volume_raw:
             showgrid=True, 
             gridcolor="rgba(255,255,255,0.05)",
             title="Total kg Moved",
-            range=[0, y_limit], # Fixed: Forces graph to start at 0
+            range=[0, y_limit],
             rangemode='tozero'
         )
     )
@@ -61,18 +58,14 @@ if volume_raw:
 else:
     st.info("Log your first session below to initialize the Performance Graph.")
 
-
-
 st.markdown("---")
 
-# --- 3. TARGETED MUSCLE GROUP TABLES ---
+# --- TARGETED MUSCLE GROUP TABLES ---
 muscle_groups = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Forearms"]
 
-# Fetch all exercises for the user once
 all_ex_data = fetch_query("SELECT exercise_name, muscle_group, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
 all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "Prev Reps"])
 
-# Storage for editing
 updated_sessions = []
 
 for group in muscle_groups:
@@ -101,20 +94,17 @@ for group in muscle_groups:
         )
         updated_sessions.append((group, edited))
 
-# --- 4. GLOBAL SAVE SYSTEM ---
+# --- DATA SYNCHRONIZATION ---
 if st.button("💾 COMMIT ENTIRE SESSION", use_container_width=True, type="primary"):
     total_logged = 0
     for group, df in updated_sessions:
         for _, row in df.iterrows():
-            # Only log if a weight was actually entered
             if row["Weight"] > 0 and row["Exercise"]:
-                # 1. Log History (for the Graph)
                 execute_query("""
                     INSERT INTO workout_logs (user_email, exercise_name, weight, reps, sets, workout_date) 
                     VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)
                 """, (user, row["Exercise"], row["Weight"], row["Reps"], row["Sets"]))
                 
-                # 2. Update Library (for the 'Prev' context next time)
                 execute_query("""
                     INSERT INTO exercise_library (user_email, exercise_name, muscle_group, last_weight, last_reps)
                     VALUES (%s, %s, %s, %s, %s)
