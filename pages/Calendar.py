@@ -14,7 +14,7 @@ render_sidebar()
 
 user = st.session_state.user_email
 
-st.title("🗓️ Monthly Events")
+st.title("Monthly Events")
 today = datetime.now()
 
 c1, c2 = st.columns([2, 1])
