@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
-# --- CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Ethos Hub")
 
 def make_hashes(password):
@@ -89,7 +88,6 @@ w_start = t_date - timedelta(days=d_idx)
 
 b1, b2, b3 = st.columns(3)
 
-# Professional UI Label Style
 label_style = "margin:0; font-size:13px; color:gray; line-height:1.2; font-weight:500; text-transform:uppercase; letter-spacing:0.5px;"
 
 with b1:
@@ -106,19 +104,14 @@ with b1:
 
 with b2:
     with st.container(border=True):
-        st.markdown(f"<p style='{label_style}'>Training</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Training Plan</p>", unsafe_allow_html=True)
         split_res = fetch_query("SELECT split_title FROM training_splits WHERE user_email=%s AND day_name=%s", (user, d_name))
         split_name = split_res[0][0].upper() if split_res and split_res[0][0] else "REST DAY"
         st.markdown(f"<p style='color:#76b372; font-weight:bold; margin:2px 0 12px 0; font-size:18px;'>{split_name}</p>", unsafe_allow_html=True)
         
-        st.markdown(f"<p style='{label_style}'>Calendar</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Upcoming Calendar</p>", unsafe_allow_html=True)
         st.markdown("<div style='margin-top:5px;'></div>", unsafe_allow_html=True)
-        events = fetch_query("""
-            SELECT description, event_date FROM events 
-            WHERE user_email=%s AND event_date >= %s 
-            ORDER BY event_date ASC LIMIT 3
-        """, (user, t_date))
-        
+        events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 3", (user, t_date))
         if events:
             for desc, edate in events:
                 st.markdown(f"<p style='margin:0 0 2px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
@@ -127,14 +120,9 @@ with b2:
 
 with b3:
     with st.container(border=True):
-        st.markdown(f"<p style='{label_style}'>Trajectory</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Project Trajectory</p>", unsafe_allow_html=True)
         st.markdown("<div style='margin-top:5px;'></div>", unsafe_allow_html=True)
-        blueprint_tasks = fetch_query("""
-            SELECT task_description, progress FROM future_tasks 
-            WHERE user_email=%s AND progress < 100 
-            ORDER BY progress DESC LIMIT 3
-        """, (user,))
-        
+        blueprint_tasks = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 3", (user,))
         if blueprint_tasks:
             for desc, prog in blueprint_tasks:
                 st.markdown(f"<p style='margin:0 0 2px 0; font-size:14px;'><b>{int(prog)}%</b>: {desc.upper()}</p>", unsafe_allow_html=True)
@@ -142,7 +130,7 @@ with b3:
             st.caption("Strategy Map Clear.")
         
         st.markdown("<div style='margin-top:15px;'></div>", unsafe_allow_html=True)
-        st.markdown(f"<p style='{label_style}'>Today's Focus</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='{label_style}'>Focus Performance</p>", unsafe_allow_html=True)
         focus_res = fetch_query("SELECT SUM(duration_mins) FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE", (user,))
         mins = focus_res[0][0] if focus_res and focus_res[0][0] else 0
         st.markdown(f"<h2 style='color:#76b372; margin:0;'>{int(mins)} mins</h2>", unsafe_allow_html=True)
