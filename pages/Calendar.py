@@ -23,6 +23,7 @@ with c1:
     month_names = list(calendar.month_name)[1:] 
     selected_month_name = st.selectbox("Month", month_names, index=today.month-1)
 with c2:
+    # Set default to 2026 based on current year
     year = st.selectbox("Year", [2025, 2026, 2027, 2028], index=1)
 
 month_num = list(calendar.month_name).index(selected_month_name)
@@ -31,10 +32,16 @@ month_num = list(calendar.month_name).index(selected_month_name)
 with st.expander("➕ Add New Event"):
     e_date = st.date_input("Date", datetime(year, month_num, 1))
     e_desc = st.text_input("Event Name")
+    # NEW: Recurring Toggle
+    is_rec = st.checkbox("Recurring Event (Repeats every year)")
+    
     if st.button("Save Event", use_container_width=True):
         if e_desc:
-            execute_query("INSERT INTO events (user_email, event_date, description, is_done) VALUES (%s, %s, %s, %s)", 
-                          (user, e_date, e_desc, False))
+            execute_query("""
+                INSERT INTO events (user_email, event_date, description, is_done, is_recurring) 
+                VALUES (%s, %s, %s, %s, %s)
+            """, (user, e_date, e_desc, False, is_rec))
+            st.success(f"Event '{e_desc}' saved!")
             st.rerun()
 
 # --- CALENDAR STYLING ---
@@ -53,21 +60,37 @@ for week in cal_matrix:
     for i, day in enumerate(week):
         if day != 0:
             with cols[i]:
-                cur_date = f"{year}-{month_num:02d}-{day:02d}"
-                events = fetch_query("SELECT description, is_done FROM events WHERE user_email=%s AND event_date=%s", (user, cur_date))
+                # Format current date for specific matching
+                cur_date_str = f"{year}-{month_num:02d}-{day:02d}"
+                
+                # NEW FETCH LOGIC: Match exact date OR (Recurring is True AND Month/Day match)
+                events = fetch_query("""
+                    SELECT description, is_done, is_recurring FROM events 
+                    WHERE user_email=%s 
+                    AND (
+                        event_date = %s 
+                        OR (is_recurring = TRUE 
+                            AND EXTRACT(MONTH FROM event_date) = %s 
+                            AND EXTRACT(DAY FROM event_date) = %s)
+                    )
+                """, (user, cur_date_str, month_num, day))
                 
                 content = f'<p style="margin:0 0 5px 0; font-weight:bold; font-size:14px; color:#aaa;">{day}</p>'
                 
-                for desc, is_done in events:
+                for desc, is_done, is_recurring in events:
+                    # Style recurring events slightly differently to distinguish them
                     bg = "rgba(118, 179, 114, 0.2)" if is_done else "rgba(255, 75, 75, 0.2)"
                     txt_c = "#76b372" if is_done else "#ff4b4b"
+                    
+                    # Add a 🔄 icon for recurring events
+                    display_name = f"🔄 {desc.upper()}" if is_recurring else desc.upper()
                     
                     content += f"""
                         <div style="font-size:10px; color:{txt_c}; background:{bg}; 
                         padding:3px 6px; border-radius:3px; margin-bottom:4px; 
                         border-left:3px solid {txt_c}; white-space: nowrap; 
                         overflow: hidden; text-overflow: ellipsis; font-weight: bold;">
-                            {desc.upper()}
+                            {display_name}
                         </div>
                     """
                 
