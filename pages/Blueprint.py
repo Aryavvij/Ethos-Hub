@@ -14,7 +14,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 render_sidebar()
 
 user = st.session_state.user_email
-st.title("🗺️ Strategic Blueprint"
+st.title("🗺️ Strategic Blueprint")
 
 
 # --- 2. DATA ENGINE ---
