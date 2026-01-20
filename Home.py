@@ -97,9 +97,7 @@ with b1:
         tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
             for tname, tdone in tasks:
-                # Color the text itself based on status instead of using a dot
                 color = "#76b372" if tdone else "#ff4b4b"
-                # Removed the <span>●</span> or <span>○</span> part
                 st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:{color};'>{tname}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
@@ -112,7 +110,7 @@ with b2:
         events = fetch_query("""
             SELECT description, event_date FROM events 
             WHERE user_email=%s AND event_date >= %s 
-            ORDER BY event_date ASC LIMIT 5
+            ORDER BY event_date ASC LIMIT 3
         """, (user, t_date))
         
         if events:
@@ -120,7 +118,6 @@ with b2:
                 st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
         else:
             st.caption("No upcoming events.")
-        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
 with b3:
     with st.container(border=True):
@@ -129,7 +126,7 @@ with b3:
         blueprint_tasks = fetch_query("""
             SELECT task_description, progress FROM future_tasks 
             WHERE user_email=%s AND progress < 100 
-            ORDER BY progress DESC LIMIT 5
+            ORDER BY progress DESC LIMIT 3
         """, (user,))
         
         if blueprint_tasks:
@@ -137,7 +134,6 @@ with b3:
                 st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{int(prog)}%</b>: {desc.upper()}</p>", unsafe_allow_html=True)
         else:
             st.caption("Strategy Map Clear.")
-        st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
 
 # --- FINANCIAL STATUS ---
 st.markdown("### Financial Status")
