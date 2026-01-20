@@ -18,6 +18,15 @@ render_sidebar()
 # --- INITIALIZATION ---
 user = st.session_state.user_email
 st.title("Habit Lab")
+st.markdown("""
+    <style>
+    div.stButton > button[kind="primary"] {
+        background-color: #76b372 !important;
+        border-color: #76b372 !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 if 'habit_version' not in st.session_state:
     st.session_state.habit_version = 0
@@ -75,18 +84,18 @@ with st.container(border=True):
         height=400, 
         num_rows="dynamic",
         column_config=col_config,
-        key=f"editor_{data_key}"
+        key=f"editor_widget" 
     )
 
-    if st.button("Synchronize Table", use_container_width=True):
-        st.session_state[data_key] = edited_df
-        execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
+    if st.button("Synchronize Table", use_container_width=True, type="primary"):
+        valid_save_df = edited_df[edited_df["Habit Name"].str.strip() != ""]
         
-        save_count = 0
-        for _, row in edited_df.iterrows():
-            h_name = row.get("Habit Name")
-            if h_name and str(h_name).strip() != "":
-                h_clean = str(h_name).strip()
+        if not valid_save_df.empty:
+            execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
+            
+            save_count = 0
+            for _, row in valid_save_df.iterrows():
+                h_clean = str(row["Habit Name"]).strip()
                 for day_str in day_cols:
                     if row.get(day_str) == True:
                         execute_query(
@@ -94,10 +103,15 @@ with st.container(border=True):
                             (user, h_clean, month_num, year, int(day_str), True)
                         )
                 save_count += 1
-        
-        st.session_state.habit_version += 1
-        st.success(f"Successfully Synchronized {save_count} habits.")
-        st.rerun()
+            
+            if data_key in st.session_state:
+                del st.session_state[data_key]
+            
+            st.session_state.habit_version += 1
+            st.success(f"Successfully Synchronized {save_count} habits.")
+            st.rerun()
+        else:
+            st.warning("Please enter a Habit Name before synchronizing.")
 
 # --- ANALYTICS & MONTHLY PERFORMANCE ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
@@ -122,7 +136,6 @@ if not valid_df.empty:
     habit_stats = []
     ethos_green = "#76b372" 
 
-    # UPDATE: Logic for "Till Today" denominator
     today = datetime.now()
     if year == today.year and month_num == today.month:
         denominator = today.day
@@ -133,7 +146,6 @@ if not valid_df.empty:
         name = row["Habit Name"]
         if name:
             done_count = sum(1 for d in day_cols if row[d] == True)
-            # Calculate % based on elapsed days (denominator)
             pct = (done_count / denominator) * 100
             habit_stats.append({
                 "#": str(i),
