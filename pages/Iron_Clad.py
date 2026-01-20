@@ -91,6 +91,9 @@ for group in muscle_groups:
             st.caption(f"No {group} exercises found. Add your routine below.")
             group_df = pd.DataFrame([{"Exercise": "", "Sets": 0, "Weight": 0.0, "Reps": 0, "Prev Kg": 0.0, "Prev Reps": 0}])
         else:
+            # FIX: Reset the index so each sub-table starts from 0 instead of its position in the master list
+            group_df = group_df.reset_index(drop=True)
+            
             group_df["Sets"] = 0
             group_df["Weight"] = 0.0
             group_df["Reps"] = 0
@@ -100,6 +103,7 @@ for group in muscle_groups:
             group_df,
             use_container_width=True,
             num_rows="dynamic",
+            hide_index=True, # Improved UI: Hides the index column entirely
             key=f"editor_{group}",
             column_config={
                 "Prev Kg": st.column_config.NumberColumn("Prev Kg", disabled=True, format="%.1f"),
