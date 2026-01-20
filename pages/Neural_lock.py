@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 from database import execute_query, fetch_query
 from datetime import datetime
+from utils import render_sidebar
 
 # 1. PAGE CONFIG
 st.set_page_config(layout="wide", page_title="Neural Lock", page_icon="🔒")
@@ -11,6 +12,8 @@ st.set_page_config(layout="wide", page_title="Neural Lock", page_icon="🔒")
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
     st.stop()
+
+render_sidebar()
 
 user = st.session_state.user_email
 
