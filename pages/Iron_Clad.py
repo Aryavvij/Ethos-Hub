@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 from database import execute_query, fetch_query
 from datetime import datetime
 from utils import render_sidebar
@@ -34,44 +35,37 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- VOLUME MOMENTUM GRAPH ---
-volume_raw = fetch_query("""
-    SELECT workout_date, SUM(weight * reps * sets) as total_volume 
-    FROM workout_logs WHERE user_email=%s 
-    GROUP BY workout_date ORDER BY workout_date ASC LIMIT 7
+# --- GLOBAL OVERVIEW: STACKED STRENGTH EVOLUTION ---
+# This shows how your total body power is built month-over-month
+global_evolution = fetch_query("""
+    SELECT 
+        DATE_TRUNC('month', l.workout_date) as period, 
+        ex.muscle_group, 
+        SUM(l.weight * l.reps * l.sets) as total_strength
+    FROM workout_logs l
+    JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
+    WHERE l.user_email=%s
+    GROUP BY 1, 2 
+    ORDER BY 1 ASC
 """, (user,))
 
-if volume_raw:
-    v_df = pd.DataFrame(volume_raw, columns=["Date", "Volume"])
-    max_vol = v_df["Volume"].max()
-    y_limit = max_vol * 1.2 if max_vol > 0 else 1000
-
-    fig = go.Figure(go.Scatter(
-        x=v_df["Date"], 
-        y=v_df["Volume"], 
-        fill='tozeroy', 
-        line=dict(color='#76b372', width=3),
-        fillcolor='rgba(118, 179, 114, 0.2)',
-        mode='lines+markers'
-    ))
-
-    fig.update_layout(
-        title="<b>Work Capacity Trend (Total Tonnage)</b>",
-        height=250, 
-        template="plotly_dark", 
-        margin=dict(l=10, r=10, t=40, b=10),
-        xaxis=dict(showgrid=False, title="Session History"),
-        yaxis=dict(
-            showgrid=True, 
-            gridcolor="rgba(255,255,255,0.05)",
-            title="Total kg Moved",
-            range=[0, y_limit],
-            rangemode='tozero'
-        )
+if global_evolution:
+    df_evo = pd.DataFrame(global_evolution, columns=["Period", "Muscle Group", "Strength"])
+    
+    fig_evo = px.area(
+        df_evo, 
+        x="Period", 
+        y="Strength", 
+        color="Muscle Group",
+        title="<b>Total Strength Evolution (Monthly Tonnage)</b>",
+        template="plotly_dark",
+        color_discrete_sequence=px.colors.qualitative.Pastel,
+        height=400
     )
-    st.plotly_chart(fig, use_container_width=True)
+    fig_evo.update_layout(margin=dict(l=10, r=10, t=40, b=10), xaxis_title=None, yaxis_title="kg Moved")
+    st.plotly_chart(fig_evo, use_container_width=True)
 else:
-    st.info("Log your first session below to initialize the Performance Graph.")
+    st.info("Log your first session below to initialize the Evolution Graph.")
 
 st.markdown("---")
 
@@ -85,15 +79,37 @@ updated_sessions = []
 
 for group in muscle_groups:
     with st.expander(f"➔ {group.upper()} PROGRESS", expanded=(group == "Abs")):
+        
+        # --- MULTI-LINE EXERCISE PROGRESS CHART ---
+        # Shows how every individual exercise in this group has progressed over years
+        ex_history = fetch_query("""
+            SELECT workout_date, exercise_name, MAX(weight) as max_wt
+            FROM workout_logs
+            WHERE user_email=%s AND exercise_name IN (
+                SELECT exercise_name FROM exercise_library WHERE muscle_group=%s
+            )
+            GROUP BY 1, 2 ORDER BY 1 ASC
+        """, (user, group))
+
+        if ex_history:
+            h_df = pd.DataFrame(ex_history, columns=["Date", "Exercise", "Weight"])
+            fig_h = px.line(
+                h_df, x="Date", y="Weight", color="Exercise",
+                title=f"{group} Exercise Progression (Max Weight)",
+                template="plotly_dark", height=250
+            )
+            fig_h.update_layout(margin=dict(l=0, r=0, t=30, b=0), xaxis_title=None, showlegend=True)
+            fig_h.update_traces(line_width=2, mode='lines+markers')
+            st.plotly_chart(fig_h, use_container_width=True)
+
+        # --- DATA EDITOR TABLE ---
         group_df = all_ex_df[all_ex_df["Group"] == group].copy()
         
         if group_df.empty:
             st.caption(f"No {group} exercises found. Add your routine below.")
             group_df = pd.DataFrame([{"Exercise": "", "Sets": 0, "Weight": 0.0, "Reps": 0, "Prev Kg": 0.0, "Prev Reps": 0}])
         else:
-            # FIX: Reset the index so each sub-table starts from 0 instead of its position in the master list
             group_df = group_df.reset_index(drop=True)
-            
             group_df["Sets"] = 0
             group_df["Weight"] = 0.0
             group_df["Reps"] = 0
@@ -103,7 +119,7 @@ for group in muscle_groups:
             group_df,
             use_container_width=True,
             num_rows="dynamic",
-            hide_index=True, # Improved UI: Hides the index column entirely
+            hide_index=True,
             key=f"editor_{group}",
             column_config={
                 "Prev Kg": st.column_config.NumberColumn("Prev Kg", disabled=True, format="%.1f"),
