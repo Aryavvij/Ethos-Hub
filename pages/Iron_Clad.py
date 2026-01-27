@@ -17,7 +17,7 @@ render_sidebar()
 
 # --- INITIALIZATION ---
 user = st.session_state.user_email
-st.title("🏋️ Iron Clad")
+st.title("Iron Clad")
 st.caption("Performance Analytics & Progressive Overload Tracking")
 
 # --- CUSTOM CSS FOR ETHOS GREEN BUTTON ---
