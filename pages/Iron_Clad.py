@@ -81,24 +81,27 @@ for group in muscle_groups:
         
         # --- MULTI-LINE EXERCISE PROGRESS CHART ---
         ex_history = fetch_query("""
-            SELECT l.workout_date, l.exercise_name, SUM(l.weight * l.reps * l.sets) as total_tonnage
+            SELECT 
+                l.workout_date, 
+                l.exercise_name, 
+                MAX(l.weight * (36.0 / (37.0 - l.reps))) as estimated_1rm
             FROM workout_logs l
             JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
-            WHERE l.user_email=%s AND ex.muscle_group=%s
+            WHERE l.user_email=%s AND ex.muscle_group=%s AND l.reps > 0
             GROUP BY 1, 2 ORDER BY 1 ASC
         """, (user, group))
 
         if ex_history:
-            h_df = pd.DataFrame(ex_history, columns=["Date", "Exercise", "Total Tonnage"])
+            h_df = pd.DataFrame(ex_history, columns=["Date", "Exercise", "Strength Index"])
             fig_h = px.line(
-                h_df, x="Date", y="Total Tonnage", color="Exercise",
-                title=f"{group} Work Capacity (Tonnage per Exercise)",
+                h_df, x="Date", y="Strength Index", color="Exercise",
+                title=f"{group} Strength Progression (e1RM)",
                 template="plotly_dark", height=250
             )
             fig_h.update_layout(
                 margin=dict(l=0, r=0, t=30, b=0), 
                 xaxis_title=None, 
-                yaxis_title="Total kg",
+                yaxis_title="Estimated Max (kg)",
                 showlegend=True
             )
             fig_h.update_traces(line_width=2, mode='lines+markers', line_shape='spline')
