@@ -35,36 +35,50 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- GLOBAL OVERVIEW: STACKED STRENGTH EVOLUTION ---
-global_evolution = fetch_query("""
-    SELECT 
-        DATE_TRUNC('month', l.workout_date) as period, 
-        ex.muscle_group, 
-        SUM(l.weight * l.reps * l.sets) as total_strength
-    FROM workout_logs l
-    JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
-    WHERE l.user_email=%s
+# --- GLOBAL OVERVIEW: STRENGTH POTENTIAL EVOLUTION (STACKED AREA) ---
+# Logic: Sum of the best e1RM for every exercise per month, stacked by muscle group.
+global_strength_evo = fetch_query("""
+    WITH exercise_strength AS (
+        SELECT 
+            DATE_TRUNC('month', l.workout_date) as period, 
+            ex.muscle_group, 
+            l.exercise_name,
+            MAX(l.weight * (36.0 / (37.0 - l.reps))) as max_e1rm
+        FROM workout_logs l
+        JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
+        WHERE l.user_email=%s AND l.reps > 0
+        GROUP BY 1, 2, 3
+    )
+    SELECT period, muscle_group, SUM(max_e1rm) as total_muscle_strength
+    FROM exercise_strength
     GROUP BY 1, 2 
     ORDER BY 1 ASC
 """, (user,))
 
-if global_evolution:
-    df_evo = pd.DataFrame(global_evolution, columns=["Period", "Muscle Group", "Strength"])
+if global_strength_evo:
+    df_strength = pd.DataFrame(global_strength_evo, columns=["Period", "Muscle Group", "Strength Score"])
     
-    fig_evo = px.area(
-        df_evo, 
+    fig_strength = px.area(
+        df_strength, 
         x="Period", 
-        y="Strength", 
+        y="Strength Score", 
         color="Muscle Group",
-        title="<b>Total Strength Evolution (Monthly Tonnage)</b>",
+        title="<b>Total Strength Potential (Monthly e1RM Evolution)</b>",
         template="plotly_dark",
         color_discrete_sequence=px.colors.qualitative.Pastel,
-        height=400
+        height=450
     )
-    fig_evo.update_layout(margin=dict(l=10, r=10, t=40, b=10), xaxis_title=None, yaxis_title="kg Moved")
-    st.plotly_chart(fig_evo, use_container_width=True)
+
+    fig_strength.update_layout(
+        xaxis_title=None,
+        yaxis_title="Combined Estimated 1RM (kg)",
+        hovermode="x unified",
+        margin=dict(l=10, r=10, t=40, b=10)
+    )
+    
+    st.plotly_chart(fig_strength, use_container_width=True)
 else:
-    st.info("Log your first session below to initialize the Evolution Graph.")
+    st.info("Log your sessions to visualize your long-term strength evolution.")
 
 st.markdown("---")
 
@@ -79,7 +93,7 @@ updated_sessions = []
 for group in muscle_groups:
     with st.expander(f"➔ {group.upper()} PROGRESS", expanded=(group == "Abs")):
         
-        # --- MULTI-LINE EXERCISE PROGRESS CHART ---
+        # --- MULTI-LINE EXERCISE PROGRESS CHART (e1RM) ---
         ex_history = fetch_query("""
             SELECT 
                 l.workout_date, 
@@ -95,13 +109,13 @@ for group in muscle_groups:
             h_df = pd.DataFrame(ex_history, columns=["Date", "Exercise", "Strength Index"])
             fig_h = px.line(
                 h_df, x="Date", y="Strength Index", color="Exercise",
-                title=f"{group} Strength Progression (e1RM)",
+                title=f"{group} Exercise Strength Index (e1RM)",
                 template="plotly_dark", height=250
             )
             fig_h.update_layout(
                 margin=dict(l=0, r=0, t=30, b=0), 
                 xaxis_title=None, 
-                yaxis_title="Estimated Max (kg)",
+                yaxis_title="Est. Max (kg)",
                 showlegend=True
             )
             fig_h.update_traces(line_width=2, mode='lines+markers', line_shape='spline')
