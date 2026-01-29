@@ -20,10 +20,10 @@ st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 # --- CLASS SCHEDULER ENGINE ---
-with st.expander("➕ Add Class to Schedule", expanded=False):
+with st.expander("➕ Add Activity to Schedule", expanded=False):
     r1c1, r1c2, r1c3 = st.columns([1, 2, 1])
     day_sel = r1c1.selectbox("Day", days)
-    sub_sel = r1c2.text_input("Subject", placeholder="e.g. Data Structures")
+    sub_sel = r1c2.text_input("Activity", placeholder="e.g. Classes")
     loc_sel = r1c3.text_input("Location", placeholder="e.g. AB5-201")
 
     def time_picker(label_prefix):
@@ -41,7 +41,7 @@ with st.expander("➕ Add Class to Schedule", expanded=False):
     start_time_final = time_picker("Start")
     end_time_final = time_picker("End")
 
-    if st.button("Save Class", use_container_width=True):
+    if st.button("Save Activity", use_container_width=True):
         if sub_sel:
             time_range_str = f"{start_time_final.strftime('%H:%M')}-{end_time_final.strftime('%H:%M')}"
             execute_query("""
@@ -50,7 +50,7 @@ with st.expander("➕ Add Class to Schedule", expanded=False):
             """, (user, day_sel, start_time_final, sub_sel, f"{time_range_str}|{loc_sel}"))
             st.rerun()
         else:
-            st.error("Please enter a subject.")
+            st.error("Please enter an activity.")
 
 st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
 
