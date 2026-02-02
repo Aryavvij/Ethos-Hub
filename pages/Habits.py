@@ -96,22 +96,21 @@ with st.container(border=True):
             save_count = 0
             for _, row in valid_save_df.iterrows():
                 h_clean = str(row["Habit Name"]).strip()
+                has_any_tick = False
                 for day_str in day_cols:
                     if row.get(day_str) == True:
                         execute_query(
                             "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
                             (user, h_clean, month_num, year, int(day_str), True)
                         )
+                        has_any_tick = True
+                
+                if not has_any_tick:
+                    execute_query(
+                        "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
+                        (user, h_clean, month_num, year, 1, False) # Day 1 as placeholder
+                    )
                 save_count += 1
-            
-            if data_key in st.session_state:
-                del st.session_state[data_key]
-            
-            st.session_state.habit_version += 1
-            st.success(f"Successfully Synchronized {save_count} habits.")
-            st.rerun()
-        else:
-            st.warning("Please enter a Habit Name before synchronizing.")
 
 # --- ANALYTICS & MONTHLY PERFORMANCE ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
