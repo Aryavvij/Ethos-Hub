@@ -37,8 +37,8 @@ with c2:
 month_num = list(calendar.month_name).index(selected_month_name)
 
 # --- EVENT MANAGEMENT (Add & Delete) ---
-with st.expander("📅 Manage Calendar Events"):
-    tab1, tab2 = st.tabs(["➕ Add Event", "🗑️ Delete Event"])
+with st.expander("Manage Calendar Events"):
+    tab1, tab2 = st.tabs(["➕ Add Event", "Delete Event"])
     
     with tab1:
         e_date = st.date_input("Date", datetime(year, month_num, 1))
