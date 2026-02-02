@@ -1,74 +1,79 @@
-# Ethos Hub: Integrated Life Operating System
-
-## The Purpose: The "All-in-One" Life Operating System
-The **Ethos System** was engineered to eliminate **App Fatigue** and **Data Fragmentation**. Most people lose time and mental energy toggling between separate apps for fitness, finance, tasks, and notes. This system consolidates those silos into a single, high-performance ecosystem.
-
-### 1. Centralized Efficiency
-The website serves as a **Unified Command Center**. By housing every life domain—from **Iron Clad** (Physical) to **Neural Lock** (Cognitive)—under one authentication layer, it eliminates the "context-switching" cost that kills productivity.
-
-### 2. Integrated Intelligence
-Unlike siloed apps, this system allows different data points to talk to each other. The **Ethos Hub** (Dashboard) pulls real-time insights from across the entire platform, providing a **"Single Source of Truth."** Users no longer need to hunt for information; the information is presented exactly where and when they need it.
-
-### 3. Frictionless Execution
-The UI is optimized for speed. Through **Custom SVG Progress Rings** and **Synchronized Data Editors**, the system turns complex data entry into a 5-second task. It’s designed so the user spends less time *managing* their life and more time *living* it.
-
-**The Bottom Line:** I made this to prove that **complexity can be managed simply.** It provides a professional-grade service that makes work easier, data clearer, and execution more efficient by keeping everything in one place.
+# <p align="center">ETHOS HUB: PERSONAL OS</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" />
+</p>
 
 ---
 
-## Technical Implementation Summary
+## THE ENGINEERING PHILOSOPHY
+Ethos Hub is a **High-Availability Personal OS** engineered for the 4th-semester IT curriculum and beyond. Most productivity tools fail because they are "state-dependent"—if the browser closes, the data resets. Ethos Hub solves this through three industrial-grade pillars:
 
-* **Relational Database Integrity:** Powered by a **PostgreSQL** backend. The developer implemented a normalized schema that supports multi-user partitioning through unique identifier keys, ensuring data persistence and secure concurrent sessions.
-* **Stateful Multi-Page Routing:** Leveraging **Streamlit’s session state**, the developer engineered a secure authentication layer (SHA-256) and a persistent global sidebar, maintaining user identity across nine independent modules.
-* **Custom UI/UX Engineering:** The system utilizes **CSS Injection (Flexbox/Grid)** and **Raw SVG Rendering** to overcome framework limitations. Examples include custom-coded circular progress gauges and absolute-lock grids for visual stability.
-* **Asynchronous Data Synchronization:** Advanced **"Upsert" logic** in the performance and habit modules allows multiple dataframes to be processed and committed in a single transaction, optimizing server-side latency.
-* **Advanced Analytics:** Integration of the **Plotly engine** renders interactive sunburst hierarchies and area charts, customized with a unified brand identity for a premium user experience.
+* **Stateless Resilience:** Utilizing **PostgreSQL** as a persistent source of truth. By moving logic (like active timers) from the browser's temporary memory to a persistent SQL database, the system survives crashes, logouts, and device swaps.
+* **Modular Lab Architecture:** Isolated environments (Neural, Financial, Habit) that prevent cross-module failure and allow for independent scaling.
+* **Automated Lifecycle:** A professional **CI/CD pipeline** that treats personal growth with the same technical rigor as a commercial software product.
 
 ---
 
-## System Module Directory
+## CORE MODULES (THE LABS)
 
-### 1. Ethos Hub (The Dashboard)
-* **Purpose:** Serves as the high-level command center and data aggregator.
-* **Mechanics:** Uses relational SQL queries to pull "snapshots" of data from other modules based on the current date.
-* **Main Feature:** The **Today’s Briefing** box, providing a filtered view of classes, gym splits, and focus goals in one glance.
+### **Home Hub | Strategic Command**
+The central nervous system of the project. It serves as a high-level aggregator that pulls data from every "Lab" to provide an instantaneous briefing.
+* **Strategic Goals:** A persistent "North Star" section for Academic, Health, and Personal objectives.
+* **Daily Briefing:** Automatically fetches today's tasks from the Planner and upcoming milestones from the Calendar.
+* **Financial Snapshot:** Real-time container showing remaining budget and net debt status.
 
-### 2. Iron Clad (Performance Lab)
-* **Purpose:** Tracks physical strength development and progressive overload.
-* **Mechanics:** Implements a dual-table architecture: `exercise_library` for Personal Bests and `workout_logs` for session history.
-* **Main Feature:** The **Work Capacity Trend**, visualizing "Total Tonnage" (Weight × Reps × Sets) to measure true muscular endurance.
+### **Neural Lock | Focus Engineering**
+A high-stakes deep-work laboratory designed to eliminate "Session Fragmentation."
+* **Persistent Stopwatch:** Solves the "Browser Refresh" problem by storing `start_time` timestamps in the DB.
+* **Resume Logic:** `Elapsed Time = Current_Timestamp - DB_Stored_Start_Time`. This allows sessions to survive reboots or device changes.
+* **Visual Momentum:** Interactive **Plotly** area charts that visualize focus density over 30-day windows.
 
-### 3. Neural Lock (Deep Work)
-* **Purpose:** Facilitates high-intensity, distraction-free focus sessions.
-* **Mechanics:** Utilizes a Python-based stopwatch engine that calculates elapsed time in the app cache before committing to the database.
-* **Main Feature:** The **Neural Momentum Graph**, displaying a 30-day area chart of focus minutes to identify peak productivity patterns.
 
-### 4. Academic Trajectory (The Blueprint)
-* **Purpose:** Manages long-term strategic initiatives and project milestones.
-* **Mechanics:** Uses a hierarchical data structure to organize tasks by Category, Priority, and Timeframe.
-* **Main Feature:** The **Interactive Sunburst Map**, providing a 360-degree view of project completion percentages across life domains.
+### **Weekly Planner | Tactical Execution**
+A 7-day tactical execution grid for managing high-priority objectives.
+* **Boxed Design:** Each task is encapsulated in an isolated container for high scannability.
+* **Dynamic Progress Rings:** SVG-based circular charts provide instant visual feedback on daily completion percentages.
+* **Cleanup Protocol:** Automated maintenance to clear finished objectives and optimize the view.
 
-### 5. Weekly Planner (Execution Grid)
-* **Purpose:** Handles micro-task management and daily accountability.
-* **Mechanics:** Features a 7-column grid with "Absolute Grid Locking" via CSS for symmetrical UI across devices.
-* **Main Feature:** **Custom SVG Progress Rings** that dynamically fill as tasks are completed, providing immediate psychological feedback.
+### **Financial Lab | Resource Management**
+A personal accounting system to maintain financial transparency and prevent debt accumulation.
+* **Budgeting:** Track "Planned vs. Actual" spending for the current academic period.
+* **Debt Ledger:** Integrated tracking of net debt and repayment status, essential for student life in Bangalore.
 
-### 6. Monthly Events (Calendar)
-* **Purpose:** Tracks fixed-date commitments, deadlines, and social obligations.
-* **Mechanics:** Generates a dynamic date matrix using the Python `calendar` module to pull events assigned to specific timestamps.
-* **Main Feature:** **Status-Based Highlighting**, where pending events are flagged in Red and completed events in Green for a clear visual heat-map.
+### **Habit & Gym Labs | Consistency Engines**
+* **Trajectory Tracking:** Monitors long-term progress for physical goals (e.g., reaching a 70kg weight target).
+* **Session Logs:** Stores granular data on workouts and habits to ensure meeting the "blueprint" set at the start of the semester.
 
-### 7. Habit Lab (Consistency Tracker)
-* **Purpose:** Monitors daily recurring behaviors and atomic habits.
-* **Mechanics:** Pivots row-based SQL data into a horizontal monthly grid for efficient mass-updates in a single view.
-* **Main Feature:** The **Performance Matrix**, which calculates a daily percentage score of habit completion to visualize "winning" days.
+---
 
-### 8. Financial Hub (Capital Management)
-* **Purpose:** Orchestrates personal budgeting, spending analysis, and debt reduction.
-* **Mechanics:** Employs aggregate SQL functions (`SUM`, `COALESCE`) to calculate the delta between planned and actual expenditures.
-* **Main Feature:** The **Net Debt Tracker**, providing a specialized interface to monitor loan repayments and total financial liability.
+## DEVOPS & INFRASTRUCTURE
 
-### 9. The Pantheon (Knowledge Repository)
-* **Purpose:** Acts as a dual-mode archive for structured comparisons and deep-form note-taking.
-* **Mechanics:** Features a "Dual-Input" tab system for creating either dynamic ranking tables or markdown-supported text blocks.
-* **Main Feature:** The **Universal Search Engine**, which filters through all categories and note titles to find stored knowledge instantly.
+
+
+| Stage | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Linting** | `Flake8` | Static code analysis to ensure PEP8 compliance and prevent syntax errors. |
+| **CI** | `GitHub Actions` | Automated builds that install dependencies and verify environment health. |
+| **CD** | `Webhooks` | Post-success triggers that initiate atomic deployments to **Render**. |
+| **Auth** | `Cookie Controller` | Persistent, encrypted browser cookies to prevent session-loss on cold restarts. |
+
+---
+
+## 🛠️ TECHNICAL SPECIFICATIONS
+| Component | Description |
+| :--- | :--- |
+| **Backend** | Python 3.11 (Streamlit Framework) |
+| **Database** | PostgreSQL with `psycopg2` connection pooling |
+| **Styling** | Custom CSS injection for "Ethos Green" (#76b372) aesthetic |
+| **Visuals** | Plotly Express & SVG Graphics |
+
+---
+
+## SETUP & DEPLOYMENT
+1. **Repository Setup:**
+   ```bash
+   git clone [https://github.com/AryavVij/ethos-hub.git](https://github.com/AryavVij/ethos-hub.git)
+   pip install -r requirements.txt
