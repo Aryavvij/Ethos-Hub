@@ -4,7 +4,7 @@ from database import execute_query, fetch_query
 from utils import render_sidebar
 
 # --- PAGE CONFIGURATION ---
-st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner")
+st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner", page_icon="🗓️")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("Please log in on the Home page.")
@@ -40,6 +40,11 @@ st.markdown("""
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
     input { font-size: 12px !important; }
+    
+    /* Ensuring the container border looks clean */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        margin-bottom: 5px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -62,6 +67,7 @@ for i, day_name in enumerate(days):
     progress_pct = int((done_tasks / total_tasks * 100)) if total_tasks > 0 else 0
     
     with cols[i]:
+        # DAY HEADER
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
                 <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
@@ -92,20 +98,20 @@ for i, day_name in enumerate(days):
         
         # TASK EXECUTION LIST
         for tid, tname, tdone in tasks:
-            # Display tasks. Checking them updates the 'is_done' status in DB.
-            if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
-                if not tdone:
-                    execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
-                    st.rerun()
-            else:
-                if tdone:
-                    execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
-                    st.rerun()
+            # Using border=True to give each task its own physical box
+            with st.container(border=True):
+                if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
+                    if not tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
+                        st.rerun()
+                else:
+                    if tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
+                        st.rerun()
 
 # --- CLEANUP LOGIC ---
 st.markdown("---")
-if st.button("🗑️ CLEAN FINISHED TASKS", use_container_width=True, type="primary"):
-    # This deletes all tasks marked as 'Done' for the current user and week
+if st.button("CLEAN FINISHED TASKS", use_container_width=True, type="primary"):
     execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND week_start=%s AND is_done=True", (user, start_date))
     st.success("Finished tasks cleared from the week.")
     st.rerun()
