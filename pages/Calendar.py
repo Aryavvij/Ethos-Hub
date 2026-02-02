@@ -17,8 +17,6 @@ render_sidebar()
 user = st.session_state.user_email
 st.title("Monthly Events")
 today = datetime.now()
-
-# Custom CSS for Ethos Green Button
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -58,7 +56,6 @@ with st.expander("📅 Manage Calendar Events"):
 
     with tab2:
         st.subheader("Search & Remove")
-        # Fetching events to populate the deletion dropdown
         existing_events = fetch_query("""
             SELECT id, description, event_date 
             FROM events 
@@ -67,7 +64,6 @@ with st.expander("📅 Manage Calendar Events"):
         """, (user,))
         
         if existing_events:
-            # Create a dictionary for easy selection
             event_map = {f"{row[2]} | {row[1]}": row[0] for row in existing_events}
             selected_event_label = st.selectbox("Select event to remove", options=list(event_map.keys()))
             
@@ -110,7 +106,6 @@ for week in cal_matrix:
                 content = f'<p style="margin:0 0 5px 0; font-weight:bold; font-size:14px; color:#aaa;">{day}</p>'
                 
                 for desc, is_done, is_recurring in events:
-                    # Styling logic based on status
                     bg = "rgba(118, 179, 114, 0.2)" if is_done else "rgba(255, 75, 75, 0.15)"
                     txt_c = "#76b372" if is_done else "#ff4b4b"
                     
