@@ -22,6 +22,13 @@ t_date = now.date()
 st.title("🔒 Neural Lock")
 st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
 
+# --- PERSISTENT STATE ---
+if 'active_task' not in st.session_state:
+    st.session_state.active_task = ""
+if 'stopwatch_start' not in st.session_state:
+    st.session_state.stopwatch_start = None
+
+# Custom CSS for Ethos Green Buttons
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -68,7 +75,7 @@ with m2:
     month_avg = int(m_df["Mins"].mean()) if not m_df.empty else 0
     st.metric("Monthly Daily Avg", f"{month_avg}m")
 with m3:
-    status = "🔴 IDLE" if 'stopwatch_start' not in st.session_state or st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
+    status = "🔴 IDLE" if st.session_state.stopwatch_start is None else "🟢 LOCKED IN"
     st.metric("System Status", status)
 
 # --- VISUAL MOMENTUM ---
@@ -87,30 +94,30 @@ st.markdown("---")
 # --- FOCUS ENGINE (STOPWATCH) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
-if 'active_task' not in st.session_state:
-    st.session_state.active_task = ""
+# Callback to ensure task name is saved to state immediately
+def sync_task():
+    st.session_state.active_task = st.session_state.task_input_widget
 
 with col_timer:
     st.subheader("Focus Session")
-
-    is_running = 'stopwatch_start' in st.session_state and st.session_state.stopwatch_start is not None
     
-    task_input = st.text_input(
+    is_running = st.session_state.stopwatch_start is not None
+    
+    # Task Input with callback
+    task_name = st.text_input(
         "Objective", 
         value=st.session_state.active_task,
         placeholder="What are you crushing right now?", 
         label_visibility="collapsed",
-        disabled=is_running
+        disabled=is_running,
+        key="task_input_widget",
+        on_change=sync_task
     )
-    
-    if not is_running:
-        st.session_state.active_task = task_input
     
     timer_placeholder = st.empty()
     action_placeholder = st.empty()
 
     if not is_running:
-        st.session_state.stopwatch_start = None
         timer_placeholder.markdown(f"""
             <div style="text-align: center; border: 2px solid #333; padding: 40px; border-radius: 15px; background: rgba(255, 255, 255, 0.02);">
                 <h1 style="font-size: 60px; color: #444; margin: 0; font-family: monospace;">00:00</h1>
@@ -125,18 +132,23 @@ with col_timer:
                 st.session_state.stopwatch_start = time.time()
                 st.rerun()
     else:
+        # STOP LOGIC
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
             
+            # Use the saved active_task from session state
+            final_task = st.session_state.active_task if st.session_state.active_task else "Deep Work"
+            
             execute_query(
                 "INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)",
-                (user, st.session_state.active_task, duration_mins)
+                (user, final_task, duration_mins)
             )
             st.session_state.stopwatch_start = None
-            st.session_state.active_task = "" 
+            st.session_state.active_task = "" # Clear for next session
             st.rerun()
 
+        # UPDATING TIMER
         elapsed = int(time.time() - st.session_state.stopwatch_start)
         mins, secs = divmod(elapsed, 60)
         timer_placeholder.markdown(f"""
@@ -166,7 +178,7 @@ with col_log:
             column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")}
         )
         
-        with st.expander("🗑️ Delete Session"):
+        with st.expander("Delete Session"):
             session_options = {f"{row[1]} ({row[2]}m)": row[0] for row in today_data}
             to_delete = st.selectbox("Select session to remove", options=list(session_options.keys()))
             if st.button("Confirm Delete", use_container_width=True):
