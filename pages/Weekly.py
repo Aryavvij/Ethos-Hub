@@ -22,6 +22,11 @@ st.markdown("""
         justify-content: flex-start;
         min-width: 0px !important;
     }
+    div.stButton > button[kind="primary"] {
+        background-color: #76b372 !important;
+        border-color: #76b372 !important;
+        color: white !important;
+    }
     .progress-wrapper {
         width: 100%;
         height: 100px; 
@@ -34,16 +39,6 @@ st.markdown("""
     .circle-bg { fill: none; stroke: #333; stroke-width: 2.8; }
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
-    .task-row-container {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        height: 40px;
-        margin-bottom: 5px;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 4px;
-        border: 1px solid #444;
-    }
     input { font-size: 12px !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -98,12 +93,20 @@ for i, day_name in enumerate(days):
         
         # TASK EXECUTION LIST
         for tid, tname, tdone in tasks:
-            with st.container(border=True):
-                if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
-                    if not tdone:
-                        execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
-                        st.rerun()
-                else:
-                    if tdone:
-                        execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
-                        st.rerun()
+            # Display tasks. Checking them updates the 'is_done' status in DB.
+            if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
+                if not tdone:
+                    execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
+                    st.rerun()
+            else:
+                if tdone:
+                    execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
+                    st.rerun()
+
+# --- CLEANUP LOGIC ---
+st.markdown("---")
+if st.button("🗑️ CLEAN FINISHED TASKS", use_container_width=True, type="primary"):
+    # This deletes all tasks marked as 'Done' for the current user and week
+    execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND week_start=%s AND is_done=True", (user, start_date))
+    st.success("Finished tasks cleared from the week.")
+    st.rerun()
