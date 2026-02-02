@@ -22,6 +22,7 @@ t_date = now.date()
 st.title("🔒 Neural Lock")
 st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
 
+# Custom CSS for Ethos Green Buttons
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -32,11 +33,40 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- PERSISTENT STOPWATCH ENGINE ---
+# --- ANALYTICS ENGINE ---
+c_sel1, c_sel2 = st.columns([2, 1])
+with c_sel1:
+    month_names = ["January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
+    selected_month_name = st.selectbox("View History", month_names, index=now.month-1)
+    month_num = month_names.index(selected_month_name) + 1
+with c_sel2:
+    selected_year = st.selectbox("Year", [2025, 2026, 2027], index=1)
+
+monthly_raw = fetch_query("""
+    SELECT EXTRACT(DAY FROM session_date) as day, SUM(duration_mins) 
+    FROM focus_sessions 
+    WHERE user_email=%s 
+    AND EXTRACT(MONTH FROM session_date) = %s 
+    AND EXTRACT(YEAR FROM session_date) = %s
+    GROUP BY day ORDER BY day
+""", (user, month_num, selected_year))
+
+m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
+
+# --- VISUAL MOMENTUM ---
+if not m_df.empty:
+    fig_m = px.area(m_df, x="Day", y="Mins", color_discrete_sequence=['#76b372'], template="plotly_dark")
+    fig_m.update_layout(height=250, margin=dict(l=0, r=0, t=10, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        xaxis=dict(showgrid=False, title="Day", range=[1, 31]), yaxis=dict(showgrid=True, title="Minutes"))
+    st.plotly_chart(fig_m, use_container_width=True)
+
 st.markdown("---")
+
+# --- PERSISTENT STOPWATCH ENGINE ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
-
+# 1. Check DB for active session to handle persistence across logouts/refreshes
 active_session = fetch_query("SELECT task_name, start_time FROM active_sessions WHERE user_email=%s", (user,))
 
 with col_timer:
@@ -45,6 +75,7 @@ with col_timer:
     action_placeholder = st.empty()
 
     if not active_session:
+        # IDLE STATE
         task_input = st.text_input("Objective", placeholder="What are you crushing right now?", key="new_task_input", label_visibility="collapsed")
         
         timer_placeholder.markdown("""
@@ -56,18 +87,21 @@ with col_timer:
 
         if action_placeholder.button("INITIATE STOPWATCH", use_container_width=True, type="primary"):
             if task_input:
+                # Store the start time in the DB so it survives logouts
                 execute_query("INSERT INTO active_sessions (user_email, task_name, start_time) VALUES (%s, %s, %s)", 
                               (user, task_input, datetime.now()))
                 st.rerun()
             else:
                 st.error("Define an objective first.")
     else:
+        # RUNNING STATE
         task_name, start_time = active_session[0]
         
+        # Calculate real elapsed time from the DB timestamp
         elapsed_delta = datetime.now() - start_time
         elapsed_seconds = int(elapsed_delta.total_seconds())
-        mins, secs = divmod(elapsed_seconds, 60)
-        hours, mins = divmod(mins, 60)
+        hours, remainder = divmod(elapsed_seconds, 3600)
+        mins, secs = divmod(remainder, 60)
 
         timer_placeholder.markdown(f"""
             <div style="text-align: center; border: 2px solid #76b372; padding: 40px; border-radius: 15px; background: rgba(118, 179, 114, 0.05);">
@@ -79,27 +113,42 @@ with col_timer:
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             duration_mins = max(1, elapsed_seconds // 60)
             
-            execute_query("INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)",
+            # 1. Log the completed session to history
+            execute_query("INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)", 
                           (user, task_name, duration_mins))
             
+            # 2. Wipe the active session from the DB
             execute_query("DELETE FROM active_sessions WHERE user_email=%s", (user,))
             st.rerun()
+        
+        # Auto-refresh every second to keep the clock ticking live
         time.sleep(1)
         st.rerun()
 
-# --- SESSION LOG & DELETION ---
+# --- SESSION LOG ---
 with col_log:
     st.subheader("Today's Log")
-    today_data = fetch_query("SELECT id, task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = CURRENT_DATE ORDER BY id DESC", (user,))
+    today_data = fetch_query("""
+        SELECT id, task_name, duration_mins 
+        FROM focus_sessions 
+        WHERE user_email=%s AND session_date = CURRENT_DATE 
+        ORDER BY id DESC
+    """, (user,))
     
     if today_data:
         log_df = pd.DataFrame(today_data, columns=["ID", "Objective", "Duration"])
-        st.dataframe(log_df.drop(columns=["ID"]), use_container_width=True, hide_index=True,
-                     column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")})
+        st.dataframe(
+            log_df.drop(columns=["ID"]), 
+            use_container_width=True, 
+            hide_index=True, 
+            column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")}
+        )
         
-        with st.expander("Delete Session"):
+        with st.expander("🗑️ Delete Session"):
             session_options = {f"{row[1]} ({row[2]}m)": row[0] for row in today_data}
             to_delete = st.selectbox("Select session to remove", options=list(session_options.keys()))
             if st.button("Confirm Delete", use_container_width=True):
                 execute_query("DELETE FROM focus_sessions WHERE id=%s", (session_options[to_delete],))
                 st.rerun()
+    else:
+        st.caption("No sessions logged today.")
