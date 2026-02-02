@@ -22,7 +22,6 @@ t_date = now.date()
 st.title("🔒 Neural Lock")
 st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
 
-# Custom CSS for Ethos Green Buttons
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -93,8 +92,7 @@ if 'active_task' not in st.session_state:
 
 with col_timer:
     st.subheader("Focus Session")
-    
-    # If timer is running, disable the input so the task name stays locked
+
     is_running = 'stopwatch_start' in st.session_state and st.session_state.stopwatch_start is not None
     
     task_input = st.text_input(
@@ -127,21 +125,18 @@ with col_timer:
                 st.session_state.stopwatch_start = time.time()
                 st.rerun()
     else:
-        # STOP LOGIC
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
             
-            # Use the saved active_task from session state
             execute_query(
                 "INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)",
                 (user, st.session_state.active_task, duration_mins)
             )
             st.session_state.stopwatch_start = None
-            st.session_state.active_task = "" # Reset task for next time
+            st.session_state.active_task = "" 
             st.rerun()
 
-        # UPDATING TIMER
         elapsed = int(time.time() - st.session_state.stopwatch_start)
         mins, secs = divmod(elapsed, 60)
         timer_placeholder.markdown(f"""
@@ -163,7 +158,6 @@ with col_log:
     """, (user,))
     
     if today_data:
-        # We use a dataframe to show the log
         log_df = pd.DataFrame(today_data, columns=["ID", "Objective", "Duration"])
         st.dataframe(
             log_df.drop(columns=["ID"]), 
@@ -172,7 +166,6 @@ with col_log:
             column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")}
         )
         
-        # DELETE OPTION
         with st.expander("🗑️ Delete Session"):
             session_options = {f"{row[1]} ({row[2]}m)": row[0] for row in today_data}
             to_delete = st.selectbox("Select session to remove", options=list(session_options.keys()))
