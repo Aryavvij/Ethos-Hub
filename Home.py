@@ -3,14 +3,24 @@ import hashlib
 from datetime import datetime, timedelta  
 from database import execute_query, fetch_query
 from utils import render_sidebar
+from streamlit_cookies_controller import CookieController
 
 st.set_page_config(layout="wide", page_title="Ethos Hub")
+controller = CookieController()
+cookie_name = "ethos_user_token"
 
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
+# --- STICKY LOGIN LOGIC ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    saved_user = controller.get(cookie_name)
+    if saved_user:
+        st.session_state.logged_in = True
+        st.session_state.user_email = saved_user
 
 # --- AUTHENTICATION SECTION ---
 if not st.session_state.logged_in:
@@ -25,6 +35,7 @@ if not st.session_state.logged_in:
             if res and res[0][0] == make_hashes(password):
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
+                controller.set(cookie_name, email)
                 st.rerun() 
             else:
                 st.error("Incorrect Email or Password")
