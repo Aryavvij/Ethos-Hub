@@ -22,6 +22,17 @@ t_date = now.date()
 st.title("🔒 Neural Lock")
 st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
 
+# Custom CSS for Ethos Green Buttons
+st.markdown("""
+    <style>
+    div.stButton > button[kind="primary"] {
+        background-color: #76b372 !important;
+        border-color: #76b372 !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- DATE FILTERS ---
 c_sel1, c_sel2 = st.columns([2, 1])
 with c_sel1:
@@ -77,17 +88,31 @@ st.markdown("---")
 # --- FOCUS ENGINE (STOPWATCH) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
+if 'active_task' not in st.session_state:
+    st.session_state.active_task = ""
+
 with col_timer:
     st.subheader("Focus Session")
-    task_name = st.text_input("Objective", placeholder="What are you crushing right now?", label_visibility="collapsed")
+    
+    # If timer is running, disable the input so the task name stays locked
+    is_running = 'stopwatch_start' in st.session_state and st.session_state.stopwatch_start is not None
+    
+    task_input = st.text_input(
+        "Objective", 
+        value=st.session_state.active_task,
+        placeholder="What are you crushing right now?", 
+        label_visibility="collapsed",
+        disabled=is_running
+    )
+    
+    if not is_running:
+        st.session_state.active_task = task_input
     
     timer_placeholder = st.empty()
     action_placeholder = st.empty()
 
-    if 'stopwatch_start' not in st.session_state:
+    if not is_running:
         st.session_state.stopwatch_start = None
-
-    if st.session_state.stopwatch_start is None:
         timer_placeholder.markdown(f"""
             <div style="text-align: center; border: 2px solid #333; padding: 40px; border-radius: 15px; background: rgba(255, 255, 255, 0.02);">
                 <h1 style="font-size: 60px; color: #444; margin: 0; font-family: monospace;">00:00</h1>
@@ -95,44 +120,65 @@ with col_timer:
             </div>
         """, unsafe_allow_html=True)
         
-        if action_placeholder.button("INITIATE STOPWATCH", use_container_width=True):
-            if not task_name: st.error("Define an objective first.")
+        if action_placeholder.button("INITIATE STOPWATCH", use_container_width=True, type="primary"):
+            if not st.session_state.active_task: 
+                st.error("Define an objective first.")
             else:
                 st.session_state.stopwatch_start = time.time()
                 st.rerun()
     else:
+        # STOP LOGIC
         if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
             elapsed = int(time.time() - st.session_state.stopwatch_start)
             duration_mins = max(1, elapsed // 60)
+            
+            # Use the saved active_task from session state
             execute_query(
                 "INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)",
-                (user, task_name, duration_mins)
+                (user, st.session_state.active_task, duration_mins)
             )
             st.session_state.stopwatch_start = None
+            st.session_state.active_task = "" # Reset task for next time
             st.rerun()
 
+        # UPDATING TIMER
         elapsed = int(time.time() - st.session_state.stopwatch_start)
         mins, secs = divmod(elapsed, 60)
         timer_placeholder.markdown(f"""
             <div style="text-align: center; border: 2px solid #76b372; padding: 40px; border-radius: 15px; background: rgba(118, 179, 114, 0.05);">
                 <h1 style="font-size: 60px; color: #76b372; margin: 0; font-family: monospace;">{mins:02d}:{secs:02d}</h1>
-                <p style="color: #76b372; letter-spacing: 5px; font-weight: bold;">LOCKED ON: {task_name.upper()}</p>
+                <p style="color: #76b372; letter-spacing: 5px; font-weight: bold;">LOCKED ON: {st.session_state.active_task.upper()}</p>
             </div>
         """, unsafe_allow_html=True)
 
-# --- SESSION LOG ---
+# --- SESSION LOG & DELETION ---
 with col_log:
     st.subheader("Today's Log")
+    
     today_data = fetch_query("""
-        SELECT task_name, duration_mins 
+        SELECT id, task_name, duration_mins 
         FROM focus_sessions 
         WHERE user_email=%s AND session_date = CURRENT_DATE 
         ORDER BY id DESC
     """, (user,))
     
     if today_data:
-        log_df = pd.DataFrame(today_data, columns=["Objective", "Duration"])
-        st.dataframe(log_df, use_container_width=True, hide_index=True,
-            column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")})
+        # We use a dataframe to show the log
+        log_df = pd.DataFrame(today_data, columns=["ID", "Objective", "Duration"])
+        st.dataframe(
+            log_df.drop(columns=["ID"]), 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")}
+        )
+        
+        # DELETE OPTION
+        with st.expander("🗑️ Delete Session"):
+            session_options = {f"{row[1]} ({row[2]}m)": row[0] for row in today_data}
+            to_delete = st.selectbox("Select session to remove", options=list(session_options.keys()))
+            if st.button("Confirm Delete", use_container_width=True):
+                execute_query("DELETE FROM focus_sessions WHERE id=%s", (session_options[to_delete],))
+                st.success("Session deleted.")
+                st.rerun()
     else:
         st.caption("No sessions logged today.")
