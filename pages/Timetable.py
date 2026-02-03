@@ -41,9 +41,8 @@ def time_picker(label_prefix, default_h=8, default_m=0, default_p="AM", key_suff
     return time(h24, int(m))
 
 # --- SCHEDULE MANAGER (ADD / EDIT / DELETE) ---
-with st.expander("🛠️ Schedule Manager (Add, Edit, or Delete Activities)", expanded=False):
+with st.expander("Schedule Manager", expanded=False):
     mode = st.radio("Action Protocol", ["Add New", "Edit Activity", "Delete Activity"], horizontal=True)
-    st.markdown("---")
 
     if mode == "Add New":
         r1c1, r1c2, r1c3 = st.columns([1, 2, 1])
