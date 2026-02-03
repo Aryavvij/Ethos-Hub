@@ -144,7 +144,7 @@ with col_log:
             column_config={"Duration": st.column_config.NumberColumn("Mins", format="%d m")}
         )
         
-        with st.expander("🗑️ Delete Session"):
+        with st.expander("Delete Session"):
             session_options = {f"{row[1]} ({row[2]}m)": row[0] for row in today_data}
             to_delete = st.selectbox("Select session to remove", options=list(session_options.keys()))
             if st.button("Confirm Delete", use_container_width=True):
