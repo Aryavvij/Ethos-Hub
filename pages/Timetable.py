@@ -8,7 +8,6 @@ st.set_page_config(layout="wide", page_title="Weekly Timetable")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.warning("⚠️ Access Denied. Please log in on the Home page.")
-    if st.button("Go to Home"): st.switch_page("Home.py")
     st.stop()
 
 render_sidebar()
@@ -16,41 +15,110 @@ render_sidebar()
 # --- INITIALIZATION ---
 user = st.session_state.user_email
 st.title("📅 Weekly Timetable")
-st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- CLASS SCHEDULER ENGINE ---
-with st.expander("➕ Add Activity to Schedule", expanded=False):
-    r1c1, r1c2, r1c3 = st.columns([1, 2, 1])
-    day_sel = r1c1.selectbox("Day", days)
-    sub_sel = r1c2.text_input("Activity", placeholder="e.g. Classes")
-    loc_sel = r1c3.text_input("Location", placeholder="e.g. AB5-201")
+# Custom CSS for Green Action Buttons
+st.markdown("""
+    <style>
+    div.stButton > button[kind="primary"] {
+        background-color: #76b372 !important;
+        border-color: #76b372 !important;
+        color: white !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-    def time_picker(label_prefix):
-        st.write(f"**{label_prefix} Time**")
-        p1, p2, p3 = st.columns([1, 1, 1])
-        h = p1.selectbox(f"Hour ({label_prefix})", [i for i in range(1, 13)], index=8, label_visibility="collapsed")
-        m = p2.selectbox(f"Minute ({label_prefix})", [f"{i:02d}" for i in range(60)], index=0, label_visibility="collapsed")
-        period = p3.selectbox(f"AM/PM ({label_prefix})", ["AM", "PM"], index=0, label_visibility="collapsed")
-        
-        h24 = int(h)
-        if period == "PM" and h24 != 12: h24 += 12
-        if period == "AM" and h24 == 12: h24 = 0
-        return time(h24, int(m))
+# --- TIME PICKER UTILITY ---
+def time_picker(label_prefix, default_h=8, default_m=0, default_p="AM", key_suffix=""):
+    st.write(f"**{label_prefix} Time**")
+    p1, p2, p3 = st.columns([1, 1, 1])
+    h = p1.selectbox(f"H{key_suffix}", [i for i in range(1, 13)], index=default_h-1, label_visibility="collapsed", key=f"h_{label_prefix}_{key_suffix}")
+    m = p2.selectbox(f"M{key_suffix}", [f"{i:02d}" for i in range(60)], index=default_m, label_visibility="collapsed", key=f"m_{label_prefix}_{key_suffix}")
+    period = p3.selectbox(f"P{key_suffix}", ["AM", "PM"], index=0 if default_p=="AM" else 1, label_visibility="collapsed", key=f"p_{label_prefix}_{key_suffix}")
+    
+    h24 = int(h)
+    if period == "PM" and h24 != 12: h24 += 12
+    if period == "AM" and h24 == 12: h24 = 0
+    return time(h24, int(m))
 
-    start_time_final = time_picker("Start")
-    end_time_final = time_picker("End")
+# --- SCHEDULE MANAGER (ADD / EDIT / DELETE) ---
+with st.expander("🛠️ Schedule Manager (Add, Edit, or Delete Activities)", expanded=False):
+    mode = st.radio("Action Protocol", ["Add New", "Edit Activity", "Delete Activity"], horizontal=True)
+    st.markdown("---")
 
-    if st.button("Save Activity", use_container_width=True):
-        if sub_sel:
-            time_range_str = f"{start_time_final.strftime('%H:%M')}-{end_time_final.strftime('%H:%M')}"
-            execute_query("""
-                INSERT INTO timetable (user_email, day_name, start_time, subject, location) 
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user, day_sel, start_time_final, sub_sel, f"{time_range_str}|{loc_sel}"))
-            st.rerun()
+    if mode == "Add New":
+        r1c1, r1c2, r1c3 = st.columns([1, 2, 1])
+        day_sel = r1c1.selectbox("Day", days, key="add_day")
+        sub_sel = r1c2.text_input("Activity", placeholder="e.g. Data Structures Lab", key="add_sub")
+        loc_sel = r1c3.text_input("Location", placeholder="e.g. AB5-201", key="add_loc")
+
+        s_time = time_picker("Start", key_suffix="add_s")
+        e_time = time_picker("End", default_h=9, key_suffix="add_e")
+
+        if st.button("SAVE TO TIMETABLE", use_container_width=True, type="primary"):
+            if sub_sel:
+                time_range_str = f"{s_time.strftime('%H:%M')}-{e_time.strftime('%H:%M')}"
+                execute_query("""
+                    INSERT INTO timetable (user_email, day_name, start_time, subject, location) 
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (user, day_sel, s_time, sub_sel, f"{time_range_str}|{loc_sel}"))
+                st.rerun()
+            else:
+                st.error("Missing activity name.")
+
+    else:
+        # SEARCH AND SELECTION ENGINE
+        all_activities = fetch_query("""
+            SELECT id, day_name, subject, start_time 
+            FROM timetable WHERE user_email=%s 
+            ORDER BY CASE WHEN day_name='Monday' THEN 1 WHEN day_name='Tuesday' THEN 2 
+            WHEN day_name='Wednesday' THEN 3 WHEN day_name='Thursday' THEN 4 
+            WHEN day_name='Friday' THEN 5 WHEN day_name='Saturday' THEN 6 ELSE 7 END, start_time
+        """, (user,))
+
+        if all_activities:
+            act_options = {f"{row[1]} | {row[2].upper()} ({row[3].strftime('%I:%M %p')})": row[0] for row in all_activities}
+            selected_label = st.selectbox("Search & Select Activity to Modify", options=list(act_options.keys()))
+            selected_id = act_options[selected_label]
+
+            if mode == "Delete Activity":
+                if st.button("CONFIRM PERMANENT DELETE", use_container_width=True, type="primary"):
+                    execute_query("DELETE FROM timetable WHERE id=%s", (selected_id,))
+                    st.success("Activity purged.")
+                    st.rerun()
+            
+            elif mode == "Edit Activity":
+                # Fetch Current Data
+                curr = fetch_query("SELECT day_name, subject, location, start_time FROM timetable WHERE id=%s", (selected_id,))[0]
+                
+                # Split time and location strings
+                try:
+                    curr_time_part, curr_loc = curr[2].split('|')
+                    c_start_str, c_end_str = curr_time_part.split('-')
+                    # Parse for default values
+                    def_h = int(c_start_str.split(':')[0])
+                    def_m = int(c_start_str.split(':')[1])
+                except:
+                    curr_loc = curr[2]
+                    def_h, def_m = 8, 0
+
+                e_r1c1, e_r1c2, e_r1c3 = st.columns([1, 2, 1])
+                e_day = e_r1c1.selectbox("Update Day", days, index=days.index(curr[0]))
+                e_sub = e_r1c2.text_input("Update Activity", value=curr[1])
+                e_loc = e_r1c3.text_input("Update Location", value=curr_loc)
+
+                e_start = time_picker("Update Start", default_h=def_h, default_m=def_m, key_suffix="edit_s")
+                e_end = time_picker("Update End", key_suffix="edit_e")
+
+                if st.button("PUSH UPDATES", use_container_width=True, type="primary"):
+                    time_range_str = f"{e_start.strftime('%H:%M')}-{e_end.strftime('%H:%M')}"
+                    execute_query("""
+                        UPDATE timetable SET day_name=%s, subject=%s, location=%s, start_time=%s 
+                        WHERE id=%s
+                    """, (e_day, e_sub, f"{time_range_str}|{e_loc}", e_start, selected_id))
+                    st.rerun()
         else:
-            st.error("Please enter an activity.")
+            st.info("Your timetable is currently empty.")
 
 st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
 
@@ -83,7 +151,3 @@ for i, day in enumerate(days):
                 st.markdown(f"**{csub.upper()}**")
                 if loc:
                     st.caption(f"📍 {loc}")
-                
-                if st.button("Delete", key=f"class_{cid}", use_container_width=True):
-                    execute_query("DELETE FROM timetable WHERE id=%s", (cid,))
-                    st.rerun()
