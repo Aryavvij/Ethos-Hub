@@ -17,7 +17,6 @@ user = st.session_state.user_email
 st.title("📅 Weekly Timetable")
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# Custom CSS for Green Action Buttons
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -67,7 +66,6 @@ with st.expander("🛠️ Schedule Manager (Add, Edit, or Delete Activities)", e
                 st.error("Missing activity name.")
 
     else:
-        # SEARCH AND SELECTION ENGINE
         all_activities = fetch_query("""
             SELECT id, day_name, subject, start_time 
             FROM timetable WHERE user_email=%s 
@@ -88,14 +86,11 @@ with st.expander("🛠️ Schedule Manager (Add, Edit, or Delete Activities)", e
                     st.rerun()
             
             elif mode == "Edit Activity":
-                # Fetch Current Data
                 curr = fetch_query("SELECT day_name, subject, location, start_time FROM timetable WHERE id=%s", (selected_id,))[0]
                 
-                # Split time and location strings
                 try:
                     curr_time_part, curr_loc = curr[2].split('|')
                     c_start_str, c_end_str = curr_time_part.split('-')
-                    # Parse for default values
                     def_h = int(c_start_str.split(':')[0])
                     def_m = int(c_start_str.split(':')[1])
                 except:
