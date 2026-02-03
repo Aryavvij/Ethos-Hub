@@ -17,6 +17,7 @@ user = st.session_state.user_email
 st.title("📅 Weekly Timetable")
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+# Custom CSS for Green Action Buttons
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -31,17 +32,26 @@ st.markdown("""
 def time_picker(label_prefix, default_h=8, default_m=0, default_p="AM", key_suffix=""):
     st.write(f"**{label_prefix} Time**")
     p1, p2, p3 = st.columns([1, 1, 1])
-    h = p1.selectbox(f"H{key_suffix}", [i for i in range(1, 13)], index=default_h-1, label_visibility="collapsed", key=f"h_{label_prefix}_{key_suffix}")
-    m = p2.selectbox(f"M{key_suffix}", [f"{i:02d}" for i in range(60)], index=default_m, label_visibility="collapsed", key=f"m_{label_prefix}_{key_suffix}")
-    period = p3.selectbox(f"P{key_suffix}", ["AM", "PM"], index=0 if default_p=="AM" else 1, label_visibility="collapsed", key=f"p_{label_prefix}_{key_suffix}")
+    
+    display_h = default_h
+    if display_h > 12: display_h -= 12
+    if display_h == 0: display_h = 12
+    
+    h_options = [i for i in range(1, 13)]
+    m_options = [f"{i:02d}" for i in range(60)]
+    p_options = ["AM", "PM"]
+
+    h = p1.selectbox(f"H{key_suffix}", h_options, index=h_options.index(display_h), label_visibility="collapsed", key=f"h_{label_prefix}_{key_suffix}")
+    m = p2.selectbox(f"M{key_suffix}", m_options, index=default_m, label_visibility="collapsed", key=f"m_{label_prefix}_{key_suffix}")
+    p = p3.selectbox(f"P{key_suffix}", p_options, index=p_options.index(default_p), label_visibility="collapsed", key=f"p_{label_prefix}_{key_suffix}")
     
     h24 = int(h)
-    if period == "PM" and h24 != 12: h24 += 12
-    if period == "AM" and h24 == 12: h24 = 0
+    if p == "PM" and h24 != 12: h24 += 12
+    if p == "AM" and h24 == 12: h24 = 0
     return time(h24, int(m))
 
-# --- SCHEDULE MANAGER (ADD / EDIT / DELETE) ---
-with st.expander("Schedule Manager", expanded=False):
+# --- SCHEDULE MANAGER ---
+with st.expander("Schedule Manager (Add, Edit, or Delete Activities)", expanded=False):
     mode = st.radio("Action Protocol", ["Add New", "Edit Activity", "Delete Activity"], horizontal=True)
 
     if mode == "Add New":
@@ -61,8 +71,6 @@ with st.expander("Schedule Manager", expanded=False):
                     VALUES (%s, %s, %s, %s, %s)
                 """, (user, day_sel, s_time, sub_sel, f"{time_range_str}|{loc_sel}"))
                 st.rerun()
-            else:
-                st.error("Missing activity name.")
 
     else:
         all_activities = fetch_query("""
@@ -81,27 +89,28 @@ with st.expander("Schedule Manager", expanded=False):
             if mode == "Delete Activity":
                 if st.button("CONFIRM PERMANENT DELETE", use_container_width=True, type="primary"):
                     execute_query("DELETE FROM timetable WHERE id=%s", (selected_id,))
-                    st.success("Activity purged.")
                     st.rerun()
             
             elif mode == "Edit Activity":
                 curr = fetch_query("SELECT day_name, subject, location, start_time FROM timetable WHERE id=%s", (selected_id,))[0]
                 
                 try:
-                    curr_time_part, curr_loc = curr[2].split('|')
-                    c_start_str, c_end_str = curr_time_part.split('-')
-                    def_h = int(c_start_str.split(':')[0])
-                    def_m = int(c_start_str.split(':')[1])
+                    time_part, curr_loc = curr[2].split('|')
+                    s_str, e_str = time_part.split('-')
+                    h24 = int(s_str.split(':')[0])
+                    m24 = int(s_str.split(':')[1])
+                    p_val = "PM" if h24 >= 12 else "AM"
+                    h12 = h24 if 0 < h24 <= 12 else (h24 - 12 if h24 > 12 else 12)
                 except:
                     curr_loc = curr[2]
-                    def_h, def_m = 8, 0
+                    h12, m24, p_val = 8, 0, "AM"
 
                 e_r1c1, e_r1c2, e_r1c3 = st.columns([1, 2, 1])
                 e_day = e_r1c1.selectbox("Update Day", days, index=days.index(curr[0]))
                 e_sub = e_r1c2.text_input("Update Activity", value=curr[1])
                 e_loc = e_r1c3.text_input("Update Location", value=curr_loc)
 
-                e_start = time_picker("Update Start", default_h=def_h, default_m=def_m, key_suffix="edit_s")
+                e_start = time_picker("Update Start", default_h=h12, default_m=m24, default_p=p_val, key_suffix="edit_s")
                 e_end = time_picker("Update End", key_suffix="edit_e")
 
                 if st.button("PUSH UPDATES", use_container_width=True, type="primary"):
@@ -112,36 +121,27 @@ with st.expander("Schedule Manager", expanded=False):
                     """, (e_day, e_sub, f"{time_range_str}|{e_loc}", e_start, selected_id))
                     st.rerun()
         else:
-            st.info("Your timetable is currently empty.")
+            st.info("Timetable empty.")
 
 st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
 
 # --- WEEKLY GRID RENDERING ---
 cols = st.columns(len(days))
-
 for i, day in enumerate(days):
     with cols[i]:
         st.markdown(f"<h4 style='text-align: center; color: #76b372;'>{day[:3].upper()}</h4>", unsafe_allow_html=True)
-        day_classes = fetch_query("""
-            SELECT id, start_time, subject, location 
-            FROM timetable 
-            WHERE user_email=%s AND day_name=%s 
-            ORDER BY start_time ASC
-        """, (user, day))
-        
+        day_classes = fetch_query("SELECT id, start_time, subject, location FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, day))
         for cid, ctime, csub, cloc_raw in day_classes:
             with st.container(border=True):
                 try:
                     time_part, loc = cloc_raw.split('|')
-                    start_str, end_str = time_part.split('-')
-                    display_start = datetime.strptime(start_str, "%H:%M").strftime("%I:%M %p")
-                    display_end = datetime.strptime(end_str, "%H:%M").strftime("%I:%M %p")
+                    s_str, e_str = time_part.split('-')
+                    display_start = datetime.strptime(s_str, "%H:%M").strftime("%I:%M %p")
+                    display_end = datetime.strptime(e_str, "%H:%M").strftime("%I:%M %p")
                     display_time = f"{display_start} - {display_end}"
                 except:
                     display_time = ctime.strftime('%I:%M %p')
                     loc = cloc_raw
-
                 st.markdown(f"<span style='color:#76b372; font-weight:bold; font-size:12px;'>{display_time}</span>", unsafe_allow_html=True)
                 st.markdown(f"**{csub.upper()}**")
-                if loc:
-                    st.caption(f"📍 {loc}")
+                if loc: st.caption(f"📍 {loc}")
