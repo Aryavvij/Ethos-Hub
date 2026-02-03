@@ -20,7 +20,7 @@ user = st.session_state.user_email
 st.title("Iron Clad")
 st.caption("Performance Analytics & Progressive Overload Tracking")
 
-# --- CUSTOM CSS FOR ETHOS GREEN BUTTON ---
+# --- CUSTOM CSS ---
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -36,14 +36,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- GLOBAL OVERVIEW: STRENGTH POTENTIAL EVOLUTION (STACKED AREA) ---
-# Logic: Sum of the best e1RM for every exercise per month, stacked by muscle group.
 global_strength_evo = fetch_query("""
     WITH exercise_strength AS (
         SELECT 
             DATE_TRUNC('month', l.workout_date) as period, 
             ex.muscle_group, 
             l.exercise_name,
-            MAX(l.weight * (36.0 / (37.0 - l.reps))) as max_e1rm
+            MAX(l.weight * (1 + l.reps / 30.0)) as max_e1rm
         FROM workout_logs l
         JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
         WHERE l.user_email=%s AND l.reps > 0
@@ -63,7 +62,7 @@ if global_strength_evo:
         x="Period", 
         y="Strength Score", 
         color="Muscle Group",
-        title="<b>Total Strength Potential (Monthly e1RM Evolution)</b>",
+        title="<b>Total Strength Potential (Monthly 1RM Evolution)</b>",
         template="plotly_dark",
         color_discrete_sequence=px.colors.qualitative.Pastel,
         height=450
@@ -91,14 +90,14 @@ all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "
 updated_sessions = []
 
 for group in muscle_groups:
-    with st.expander(f"➔ {group.upper()} PROGRESS", expanded=(group == "Abs")):
+    with st.expander(f"➔ {group.upper()} PROGRESS", expanded=False):
         
-        # --- MULTI-LINE EXERCISE PROGRESS CHART (e1RM) ---
+        # --- MULTI-LINE EXERCISE PROGRESS CHART (EPLEY 1RM) ---
         ex_history = fetch_query("""
             SELECT 
                 l.workout_date, 
                 l.exercise_name, 
-                MAX(l.weight * (36.0 / (37.0 - l.reps))) as estimated_1rm
+                MAX(l.weight * (1 + l.reps / 30.0)) as estimated_1rm
             FROM workout_logs l
             JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
             WHERE l.user_email=%s AND ex.muscle_group=%s AND l.reps > 0
@@ -109,7 +108,7 @@ for group in muscle_groups:
             h_df = pd.DataFrame(ex_history, columns=["Date", "Exercise", "Strength Index"])
             fig_h = px.line(
                 h_df, x="Date", y="Strength Index", color="Exercise",
-                title=f"{group} Exercise Strength Index (e1RM)",
+                title=f"{group} Strength Index (Max 1RM Trend)",
                 template="plotly_dark", height=250
             )
             fig_h.update_layout(
@@ -151,7 +150,7 @@ for group in muscle_groups:
         updated_sessions.append((group, edited))
 
 # --- DATA SYNCHRONIZATION ---
-if st.button("💾 COMMIT ENTIRE SESSION", use_container_width=True, type="primary"):
+if st.button("COMMIT ENTIRE SESSION", use_container_width=True, type="primary"):
     total_logged = 0
     for group, df in updated_sessions:
         for _, row in df.iterrows():
