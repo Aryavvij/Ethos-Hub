@@ -87,7 +87,7 @@ with st.expander("Schedule Manager (Add, Edit, or Delete Activities)", expanded=
             selected_id = act_options[selected_label]
 
             if mode == "Delete Activity":
-                if st.button("CONFIRM PERMANENT DELETE", use_container_width=True, type="primary"):
+                if st.button("CONFIRM DELETION", use_container_width=True, type="primary"):
                     execute_query("DELETE FROM timetable WHERE id=%s", (selected_id,))
                     st.rerun()
             
@@ -113,7 +113,7 @@ with st.expander("Schedule Manager (Add, Edit, or Delete Activities)", expanded=
                 e_start = time_picker("Update Start", default_h=h12, default_m=m24, default_p=p_val, key_suffix="edit_s")
                 e_end = time_picker("Update End", key_suffix="edit_e")
 
-                if st.button("PUSH UPDATES", use_container_width=True, type="primary"):
+                if st.button("SAVE UPDATES", use_container_width=True, type="primary"):
                     time_range_str = f"{e_start.strftime('%H:%M')}-{e_end.strftime('%H:%M')}"
                     execute_query("""
                         UPDATE timetable SET day_name=%s, subject=%s, location=%s, start_time=%s 
