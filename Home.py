@@ -25,7 +25,7 @@ if not st.session_state.logged_in:
 
 # --- AUTHENTICATION SECTION ---
 if not st.session_state.logged_in:
-    st.title("🛡️ Ethos System Login")
+    st.title("Ethos System Login")
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
     
     with tab1:
@@ -36,7 +36,6 @@ if not st.session_state.logged_in:
             if res and res[0][0] == make_hashes(password):
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
-                # Set cookie for persistent login
                 controller.set(cookie_name, email)
                 st.rerun() 
             else:
