@@ -10,7 +10,7 @@ from utils import render_sidebar
 st.set_page_config(layout="wide", page_title="Habit Lab", page_icon="📈")
 
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("Please log in on the Home page.")
+    st.switch_page("Home.py") 
     st.stop()
 
 render_sidebar()
