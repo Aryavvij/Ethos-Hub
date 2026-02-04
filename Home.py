@@ -6,6 +6,7 @@ from utils import render_sidebar
 from streamlit_cookies_controller import CookieController
 
 st.set_page_config(layout="wide", page_title="Ethos Hub")
+
 controller = CookieController()
 cookie_name = "ethos_user_token"
 
@@ -24,17 +25,18 @@ if not st.session_state.logged_in:
 
 # --- AUTHENTICATION SECTION ---
 if not st.session_state.logged_in:
-    st.title("Ethos System Login")
+    st.title("🛡️ Ethos System Login")
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
     
     with tab1:
         email = st.text_input("Email")
         password = st.text_input("Password", type='password')
-        if st.button("Login"):
+        if st.button("Login", use_container_width=True):
             res = fetch_query("SELECT password FROM users WHERE email=%s", (email,))
             if res and res[0][0] == make_hashes(password):
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
+                # Set cookie for persistent login
                 controller.set(cookie_name, email)
                 st.rerun() 
             else:
@@ -44,7 +46,7 @@ if not st.session_state.logged_in:
         st.subheader("Create New Account")
         new_email = st.text_input("New Email", key="signup_email")
         new_pass = st.text_input("New Password", type='password', key="signup_pass")
-        if st.button("Sign Up"):
+        if st.button("Sign Up", use_container_width=True):
             hashed_pass = make_hashes(new_pass)
             try:
                 execute_query("INSERT INTO users (email, password) VALUES (%s, %s)", (new_email, hashed_pass))
@@ -56,6 +58,13 @@ if not st.session_state.logged_in:
 # --- DASHBOARD INITIALIZATION ---
 user = st.session_state.user_email
 render_sidebar()
+
+# --- LOGOUT BUTTON (SIDEBAR) ---
+if st.sidebar.button("🔓 Logout System", use_container_width=True):
+    st.session_state.logged_in = False
+    st.session_state.user_email = None
+    controller.remove(cookie_name)
+    st.rerun()
 
 st.title("ETHOS HUB")
 
@@ -93,22 +102,20 @@ st.markdown("---")
 st.markdown("### Today's Briefing")
 
 t_date = datetime.now().date()
-d_name = t_date.strftime("%A")
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
 b1, b2, b3 = st.columns(3)
-
 label_style = "margin:0; font-size:13px; color:gray; line-height:1.2; font-weight:500; text-transform:uppercase; letter-spacing:0.5px;"
 
 with b1:
     with st.container(border=True):
         st.markdown(f"<p style='{label_style}'>Today's Tasks</p>", unsafe_allow_html=True)
         st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-        tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
+        tasks = fetch_query("SELECT task_name FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         if tasks:
-            for tname, tdone in tasks:
-                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:white;'>{tname}</p>", unsafe_allow_html=True)
+            for tname in tasks:
+                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:white;'>{tname[0]}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
         st.markdown(" ")
