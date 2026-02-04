@@ -13,19 +13,24 @@ cookie_name = "ethos_user_token"
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- STICKY LOGIN LOGIC ---
+# --- STICKY LOGIN LOGIC (WITH SAFETY PATCH) ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    saved_user = controller.get(cookie_name)
-    if saved_user:
-        st.session_state.logged_in = True
-        st.session_state.user_email = saved_user
+    try:
+        all_cookies = controller.get_all()
+        if all_cookies and cookie_name in all_cookies:
+            saved_user = controller.get(cookie_name)
+            if saved_user:
+                st.session_state.logged_in = True
+                st.session_state.user_email = saved_user
+    except Exception:
+        pass
 
 # --- AUTHENTICATION SECTION ---
 if not st.session_state.logged_in:
-    st.title("Ethos System Login")
+    st.title("🛡️ Ethos System Login")
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
     
     with tab1:
@@ -36,6 +41,7 @@ if not st.session_state.logged_in:
             if res and res[0][0] == make_hashes(password):
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
+                
                 controller.set(cookie_name, email)
                 st.rerun() 
             else:
@@ -60,6 +66,7 @@ render_sidebar()
 
 # --- LOGOUT BUTTON (SIDEBAR) ---
 if st.sidebar.button("🔓 Logout System", use_container_width=True):
+    # Clear session and remove cookie
     st.session_state.logged_in = False
     st.session_state.user_email = None
     controller.remove(cookie_name)
@@ -117,7 +124,6 @@ with b1:
                 st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:white;'>{tname[0]}</p>", unsafe_allow_html=True)
         else:
             st.caption("No tasks for today.")
-        st.markdown(" ")
 
 with b2:
     with st.container(border=True):
@@ -134,7 +140,6 @@ with b2:
                 st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
         else:
             st.caption("No upcoming events.")
-        st.markdown(" ")
 
 with b3:
     with st.container(border=True):
@@ -151,7 +156,6 @@ with b3:
                 st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{int(prog)}%</b>: {desc.upper()}</p>", unsafe_allow_html=True)
         else:
             st.caption("Strategy Map Clear.")
-        st.markdown(" ")
 
 # --- FINANCIAL STATUS ---
 st.markdown("### Financial Status")
