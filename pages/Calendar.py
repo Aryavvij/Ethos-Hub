@@ -7,8 +7,9 @@ from utils import render_sidebar
 # --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Monthly Events", page_icon="📅")
 
+# --- AUTOMATIC REDIRECT LOGIC ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.warning("⚠️ Access Denied.")
+    st.switch_page("Home.py") 
     st.stop()
 
 render_sidebar()
