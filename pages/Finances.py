@@ -99,7 +99,7 @@ with col2:
 st.markdown("---")
 
 # --- EXPENSE LEDGER (TRANSACTION LOG) ---
-st.subheader("🧾 Expense Ledger")
+st.subheader("Expense Ledger")
 with st.expander("➕ Log New Expense", expanded=True):
     categories = edited_df["Category"].unique().tolist()
     if not categories or categories == [""]:
