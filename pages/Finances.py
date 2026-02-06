@@ -47,7 +47,7 @@ with c2:
 period = f"{selected_month_name} {selected_year}"
 
 # --- 1. DYNAMIC BUDGET ENGINE ---
-st.subheader(f"📊 Budget Allocation: {period}")
+st.subheader(f"Budget Allocation: {period}")
 
 raw_budget = fetch_query("""
     SELECT 
@@ -68,7 +68,6 @@ budget_df = pd.DataFrame(raw_budget, columns=["Category", "Planned", "Actual"])
 if budget_df.empty:
     budget_df = pd.DataFrame([{"Category": "General", "Planned": 0.0, "Actual": 0.0}])
 
-budget_df["Remaining"] = budget_df["Planned"] - budget_df["Actual"]
 edited_df = st.data_editor(
     budget_df, 
     num_rows="dynamic", 
@@ -76,9 +75,8 @@ edited_df = st.data_editor(
     key="budget_editor",
     column_config={
         "Category": st.column_config.TextColumn("Category", help="e.g. Rent, Food, Travel"),
-        "Planned": st.column_config.NumberColumn("Planned (₹)", min_value=0.0, format="₹ %.2f"),
-        "Actual": st.column_config.NumberColumn("Actual (Spent)", disabled=True, format="₹ %.2f"),
-        "Remaining": st.column_config.NumberColumn("Remaining", disabled=True, format="₹ %.2f")
+        "Planned": st.column_config.NumberColumn("Planned (₹)", min_value=0.0, format="%.2f"),
+        "Actual": st.column_config.NumberColumn("Actual (Spent)", disabled=True, format="%.2f")
     }
 )
 
@@ -128,7 +126,7 @@ with col2:
 st.markdown("---")
 
 # --- 3. EXPENSE LEDGER (TRANSACTION LOG) ---
-st.subheader("🧾 Expense Ledger")
+st.subheader("Expense Ledger")
 with st.expander("➕ Log New Expense", expanded=True):
     categories = edited_df["Category"].unique().tolist()
     if not categories or categories == [""]:
@@ -164,7 +162,7 @@ with st.expander("View Ledger History"):
     
     if expense_history:
         history_df = pd.DataFrame(expense_history, columns=["Date", "Amount", "Description", "Category"])
-        history_df["Amount"] = history_df["Amount"].apply(lambda x: f"₹ {x:,.2f}")
+        history_df["Amount"] = history_df["Amount"].apply(lambda x: f"{x:,.2f}")
         
         st.dataframe(history_df, use_container_width=True, hide_index=True)
     else:
