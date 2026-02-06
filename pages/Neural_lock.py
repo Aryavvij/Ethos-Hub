@@ -40,7 +40,7 @@ stats_query = fetch_query("""
         SUM(CASE WHEN session_date >= CURRENT_DATE - INTERVAL '7 days' THEN duration_mins ELSE 0 END) as week_total,
         SUM(CASE WHEN session_date >= DATE_TRUNC('month', CURRENT_DATE) THEN duration_mins ELSE 0 END) as month_total
     FROM focus_sessions WHERE user_email=%s
-""", (user, user)) # We pass user twice because of the subquery
+""", (user, user)) 
 
 s = stats_query[0] if stats_query else (0, 0, 0, 0)
 
@@ -88,7 +88,6 @@ st.markdown("---")
 # --- 3. PERSISTENT STOPWATCH ENGINE (WITH PAUSE LOGIC) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
-# We now fetch task_name, start_time, is_paused, and accumulated_seconds
 active_session = fetch_query("SELECT task_name, start_time, is_paused, accumulated_seconds FROM active_sessions WHERE user_email=%s", (user,))
 
 with col_timer:
@@ -115,8 +114,6 @@ with col_timer:
                 st.error("Define an objective first.")
     else:
         task_name, start_time, is_paused, acc_sec = active_session[0]
-        
-        # Calculate display time based on whether it is paused
         if not is_paused:
             elapsed_total = int((datetime.now() - start_time).total_seconds()) + acc_sec
         else:
@@ -135,17 +132,15 @@ with col_timer:
 
         btn_col1, btn_col2 = action_placeholder.columns(2)
         
-        # PAUSE / RESUME Toggle
         if not is_paused:
-            if btn_col1.button("⏸️ PAUSE", use_container_width=True):
+            if btn_col1.button("PAUSE SESSION", use_container_width=True):
                 execute_query("UPDATE active_sessions SET is_paused=True, accumulated_seconds=%s WHERE user_email=%s", (elapsed_total, user))
                 st.rerun()
         else:
-            if btn_col1.button("▶️ RESUME", use_container_width=True):
+            if btn_col1.button("RESUME SESSION", use_container_width=True):
                 execute_query("UPDATE active_sessions SET is_paused=False, start_time=%s WHERE user_email=%s", (datetime.now(), user))
                 st.rerun()
 
-        # STOP AND LOG
         if btn_col2.button("🛑 STOP & LOG", use_container_width=True):
             duration_mins = max(1, elapsed_total // 60)
             execute_query("INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)", 
@@ -161,7 +156,6 @@ with col_timer:
 with col_log:
     st.subheader("Focus Logs")
     
-    # Toggle to see history or today
     log_date = st.date_input("Filter by Date", datetime.now().date())
     
     today_data = fetch_query("""
