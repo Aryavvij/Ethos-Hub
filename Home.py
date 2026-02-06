@@ -102,7 +102,6 @@ st.markdown("### Today's Briefing")
 t_date = datetime.now().date()
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
-
 b1, b2, b3 = st.columns(3)
 label_style = "margin:0; font-size:13px; color:gray; line-height:1.2; font-weight:500; text-transform:uppercase; letter-spacing:0.5px;"
 
