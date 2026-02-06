@@ -121,6 +121,5 @@ for i, day_name in enumerate(days):
                         st.rerun()
                 
                 with c2:
-                    # Task Text
                     text_style = "text-decoration: line-through; color: gray;" if tdone else "color: white;"
                     st.markdown(f"<p style='margin:0; font-size:13px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
