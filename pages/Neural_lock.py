@@ -3,7 +3,7 @@ import time
 import pandas as pd
 import plotly.express as px
 from database import execute_query, fetch_query
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils import render_sidebar
 
 # --- PAGE CONFIGURATION ---
@@ -32,7 +32,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- ANALYTICS ENGINE ---
+# --- 1. TOP ANALYTICS OVERVIEW BAR ---
+# Logic: Today's sum, Daily Avg, Weekly sum, Monthly sum
+stats_query = fetch_query("""
+    SELECT 
+        SUM(CASE WHEN session_date = CURRENT_DATE THEN duration_mins ELSE 0 END) as today,
+        AVG(duration_mins) OVER() as daily_avg,
+        SUM(CASE WHEN session_date >= CURRENT_DATE - INTERVAL '7 days' THEN duration_mins ELSE 0 END) as week_total,
+        SUM(CASE WHEN session_date >= DATE_TRUNC('month', CURRENT_DATE) THEN duration_mins ELSE 0 END) as month_total
+    FROM focus_sessions WHERE user_email=%s LIMIT 1
+""", (user,))
+
+s = stats_query[0] if stats_query else (0, 0, 0, 0)
+
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Today's Focus", f"{int(s[0] or 0)}m")
+m2.metric("Daily Average", f"{int(s[1] or 0)}m")
+m3.metric("Weekly Total", f"{(s[2] or 0)/60:.1f}h")
+m4.metric("Monthly Total", f"{(s[3] or 0)/60:.1f}h")
+
+# --- 2. ANALYTICS ENGINE (GRAPH) ---
 c_sel1, c_sel2 = st.columns([2, 1])
 with c_sel1:
     month_names = ["January", "February", "March", "April", "May", "June", 
@@ -51,7 +70,6 @@ monthly_raw = fetch_query("""
     GROUP BY day ORDER BY day
 """, (user, month_num, selected_year))
 
-
 m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
 m_df["Hours"] = m_df["Mins"] / 60.0
 
@@ -68,10 +86,11 @@ if not m_df.empty:
 
 st.markdown("---")
 
-# --- PERSISTENT STOPWATCH ENGINE ---
+# --- 3. PERSISTENT STOPWATCH ENGINE (WITH PAUSE LOGIC) ---
 col_timer, col_log = st.columns([1.2, 1], gap="large")
 
-active_session = fetch_query("SELECT task_name, start_time FROM active_sessions WHERE user_email=%s", (user,))
+# We now fetch task_name, start_time, is_paused, and accumulated_seconds
+active_session = fetch_query("SELECT task_name, start_time, is_paused, accumulated_seconds FROM active_sessions WHERE user_email=%s", (user,))
 
 with col_timer:
     st.subheader("Focus Session")
@@ -90,52 +109,75 @@ with col_timer:
 
         if action_placeholder.button("INITIATE STOPWATCH", use_container_width=True, type="primary"):
             if task_input:
-                execute_query("INSERT INTO active_sessions (user_email, task_name, start_time) VALUES (%s, %s, %s)", 
-                              (user, task_input, datetime.now()))
+                execute_query("INSERT INTO active_sessions (user_email, task_name, start_time, is_paused, accumulated_seconds) VALUES (%s, %s, %s, %s, %s)", 
+                              (user, task_input, datetime.now(), False, 0))
                 st.rerun()
             else:
                 st.error("Define an objective first.")
     else:
-        task_name, start_time = active_session[0]
-        elapsed_delta = datetime.now() - start_time
-        elapsed_seconds = int(elapsed_delta.total_seconds())
-        hours, remainder = divmod(elapsed_seconds, 3600)
+        task_name, start_time, is_paused, acc_sec = active_session[0]
+        
+        # Calculate display time based on whether it is paused
+        if not is_paused:
+            elapsed_total = int((datetime.now() - start_time).total_seconds()) + acc_sec
+        else:
+            elapsed_total = acc_sec
+            
+        hours, remainder = divmod(elapsed_total, 3600)
         mins, secs = divmod(remainder, 60)
 
+        color = "#ffaa00" if is_paused else "#76b372"
         timer_placeholder.markdown(f"""
-            <div style="text-align: center; border: 2px solid #76b372; padding: 40px; border-radius: 15px; background: rgba(118, 179, 114, 0.05);">
-                <h1 style="font-size: 60px; color: #76b372; margin: 0; font-family: monospace;">{hours:02d}:{mins:02d}:{secs:02d}</h1>
-                <p style="color: #76b372; letter-spacing: 5px; font-weight: bold;">LOCKED ON: {task_name.upper()}</p>
+            <div style="text-align: center; border: 2px solid {color}; padding: 40px; border-radius: 15px; background: rgba(118, 179, 114, 0.05);">
+                <h1 style="font-size: 60px; color: {color}; margin: 0; font-family: monospace;">{hours:02d}:{mins:02d}:{secs:02d}</h1>
+                <p style="color: {color}; letter-spacing: 5px; font-weight: bold;">{"PAUSED: " if is_paused else "LOCKED ON: "}{task_name.upper()}</p>
             </div>
         """, unsafe_allow_html=True)
 
-        if action_placeholder.button("🛑 STOP & LOG SESSION", use_container_width=True):
-            duration_mins = max(1, elapsed_seconds // 60)
+        btn_col1, btn_col2 = action_placeholder.columns(2)
+        
+        # PAUSE / RESUME Toggle
+        if not is_paused:
+            if btn_col1.button("⏸️ PAUSE", use_container_width=True):
+                execute_query("UPDATE active_sessions SET is_paused=True, accumulated_seconds=%s WHERE user_email=%s", (elapsed_total, user))
+                st.rerun()
+        else:
+            if btn_col1.button("▶️ RESUME", use_container_width=True):
+                execute_query("UPDATE active_sessions SET is_paused=False, start_time=%s WHERE user_email=%s", (datetime.now(), user))
+                st.rerun()
+
+        # STOP AND LOG
+        if btn_col2.button("🛑 STOP & LOG", use_container_width=True):
+            duration_mins = max(1, elapsed_total // 60)
             execute_query("INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)", 
                           (user, task_name, duration_mins))
             execute_query("DELETE FROM active_sessions WHERE user_email=%s", (user,))
             st.rerun()
         
-        time.sleep(1)
-        st.rerun()
+        if not is_paused:
+            time.sleep(1)
+            st.rerun()
 
-# --- SESSION LOG & FORMATTING ---
+# --- 4. SESSION LOG & HISTORICAL VIEWER ---
 with col_log:
-    st.subheader("Today's Log")
+    st.subheader("Focus Logs")
+    
+    # Toggle to see history or today
+    log_date = st.date_input("Filter by Date", datetime.now().date())
+    
     today_data = fetch_query("""
         SELECT id, task_name, duration_mins 
         FROM focus_sessions 
-        WHERE user_email=%s AND session_date = CURRENT_DATE 
+        WHERE user_email=%s AND session_date = %s 
         ORDER BY id DESC
-    """, (user,))
+    """, (user, log_date))
     
     if today_data:
         log_df = pd.DataFrame(today_data, columns=["ID", "Objective", "Duration"])
         
         def format_duration(m):
             h, rem = divmod(m, 60)
-            if h > 0:
-                return f"{int(h)}h {int(rem)}m"
+            if h > 0: return f"{int(h)}h {int(rem)}m"
             return f"{int(rem)}m"
 
         log_df["Time Spent"] = log_df["Duration"].apply(format_duration)
@@ -153,4 +195,4 @@ with col_log:
                 execute_query("DELETE FROM focus_sessions WHERE id=%s", (session_options[to_delete],))
                 st.rerun()
     else:
-        st.caption("No sessions logged today.")
+        st.caption(f"No sessions logged for {log_date.strftime('%b %d, %Y')}.")
