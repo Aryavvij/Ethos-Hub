@@ -12,10 +12,10 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
-# --- CSS STYLING (FIXED FOR ALIGNMENT) ---
+# --- CSS STYLING (THE PRECISION FIX) ---
 st.markdown("""
     <style>
-    /* Column Alignment */
+    /* 1. Global Column Alignment */
     [data-testid="column"] {
         display: flex;
         flex-direction: column;
@@ -23,31 +23,38 @@ st.markdown("""
         min-width: 0px !important;
     }
     
-    /* ADD Button Styling */
+    /* 2. ADD Button Styling */
     div.stButton > button[kind="primary"] {
         background-color: #76b372 !important;
         border-color: #76b372 !important;
         color: white !important;
     }
 
-    /* Small Trash Button Styling */
+    /* 3. TRASH BUTTON PRECISION - Shrinking to Checkbox size */
     .stButton > button[key^="del_"] {
         border: none !important;
         background: transparent !important;
         padding: 0px !important;
-        margin-top: -10px !important; /* Pulls it up closer to checkbox */
-        height: 20px !important;
-        width: 20px !important;
-        font-size: 14px !important;
-        line-height: 1 !important;
+        margin: 0px !important;
+        height: 24px !important;  /* Matches standard checkbox height */
+        width: 24px !important;   /* Matches standard checkbox width */
+        min-height: 24px !important;
+        min-width: 24px !important;
+        line-height: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Remove the hover border to keep it sleek */
+    .stButton > button[key^="del_"]:hover {
+        background: rgba(255,255,255,0.1) !important;
+        color: #ff4b4b !important;
     }
 
     .progress-wrapper {
-        width: 100%;
-        height: 100px; 
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        width: 100%; height: 100px; 
+        display: flex; justify-content: center; align-items: center;
         margin-bottom: 10px;
     }
     .circular-chart { width: 80px; height: 80px; }
@@ -55,16 +62,16 @@ st.markdown("""
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
     
-    /* Clean Container Spacing */
+    /* Card Container Spacing */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        margin-bottom: 5px !important;
+        margin-bottom: 2px !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 user = st.session_state.user_email
 st.title("🗓️ Weekly Planner")
-start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
+start_date = st.date_input("Week Starting", datetime.now().date() - timedelta(days=datetime.now().weekday()))
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 # --- WEEKLY GRID ---
@@ -80,28 +87,14 @@ for i, day_name in enumerate(days):
     progress_pct = int((done_tasks / total_tasks * 100)) if total_tasks > 0 else 0
     
     with cols[i]:
-        st.markdown(f"""
-            <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
-                <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-            <div class="progress-wrapper">
-                <svg viewBox="0 0 36 36" class="circular-chart">
-                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    <path class="circle" stroke-dasharray="{progress_pct}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    <text x="18" y="20.5" class="percentage">{progress_pct}%</text>
-                </svg>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div style='background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white;'><strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small></div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="progress-wrapper"><svg viewBox="0 0 36 36" class="circular-chart"><path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/><path class="circle" stroke-dasharray="{progress_pct}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/><text x="18" y="20.5" class="percentage">{progress_pct}%</text></svg></div>', unsafe_allow_html=True)
         
         # Add Input
         new_task = st.text_input("Add", key=f"in_{i}", label_visibility="collapsed", placeholder="+ Task")
         if st.button("ADD", key=f"btn_{i}", use_container_width=True):
             if new_task:
-                execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, %s)", 
-                              (user, i, new_task, start_date, False))
+                execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, %s)", (user, i, new_task, start_date, False))
                 st.rerun()
 
         st.markdown("<hr style='margin:10px 0; border:0.5px solid #333;'>", unsafe_allow_html=True)
@@ -109,7 +102,7 @@ for i, day_name in enumerate(days):
         # Task List
         for tid, tname, tdone in tasks:
             with st.container(border=True):
-                c1, c2 = st.columns([0.2, 0.8])
+                c1, c2 = st.columns([0.25, 0.75])
                 
                 with c1:
                     if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
@@ -122,4 +115,10 @@ for i, day_name in enumerate(days):
                 
                 with c2:
                     text_style = "text-decoration: line-through; color: gray;" if tdone else "color: white;"
-                    st.markdown(f"<p style='margin:0; font-size:13px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='margin:0; font-size:12px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
+
+# --- CLEANUP ---
+st.markdown("---")
+if st.button("CLEAN FINISHED TASKS", use_container_width=True, type="primary"):
+    execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND week_start=%s AND is_done=True", (user, start_date))
+    st.rerun()
