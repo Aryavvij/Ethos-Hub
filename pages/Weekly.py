@@ -80,14 +80,12 @@ for i, day_name in enumerate(days):
     progress_pct = int((done_tasks / total_tasks * 100)) if total_tasks > 0 else 0
     
     with cols[i]:
-        # Header
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
                 <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
-        # Progress
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
