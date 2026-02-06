@@ -6,6 +6,20 @@ from database import execute_query, fetch_query
 from datetime import datetime
 from utils import render_sidebar
 
+st.markdown("""
+    <style>
+    div.stButton > button[kind="primary"] {
+        background-color: #76b372 !important;
+        border-color: #76b372 !important;
+        color: white !important;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #5e8f5b !important;
+        border-color: #5e8f5b !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Finances")
 
@@ -15,7 +29,6 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
-# --- INITIALIZATION ---
 user = st.session_state.user_email
 today = datetime.now()
 st.title("Financial Hub")
@@ -88,7 +101,6 @@ st.markdown("---")
 # --- EXPENSE LEDGER (TRANSACTION LOG) ---
 st.subheader("🧾 Expense Ledger")
 with st.expander("➕ Log New Expense", expanded=True):
-    # Dynamically pull categories from the budget table above
     categories = edited_df["Category"].unique().tolist()
     if not categories or categories == [""]:
         categories = ["General"]
@@ -110,8 +122,8 @@ with st.expander("➕ Log New Expense", expanded=True):
         else:
             st.error("Please provide a description and amount.")
 
-# Dropdown to see previous logs of the ongoing month
-with st.expander("📂 View Transaction History (Ongoing Month)"):
+# --- Ledger History ---
+with st.expander("View Ledger History"):
     current_month = today.month
     current_year = today.year
     
