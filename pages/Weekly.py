@@ -109,16 +109,13 @@ for i, day_name in enumerate(days):
         # Task List
         for tid, tname, tdone in tasks:
             with st.container(border=True):
-                # Stack Checkbox and Delete button vertically on the left, text on the right
                 c1, c2 = st.columns([0.2, 0.8])
                 
                 with c1:
-                    # Checkbox
                     if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
                         st.rerun()
                     
-                    # Trash Bin directly underneath the checkbox
                     if st.button("🗑️", key=f"del_{tid}"):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
