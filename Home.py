@@ -64,14 +64,6 @@ if not st.session_state.logged_in:
 user = st.session_state.user_email
 render_sidebar()
 
-# --- LOGOUT BUTTON (SIDEBAR) ---
-if st.sidebar.button("🔓 Logout System", use_container_width=True):
-    # Clear session and remove cookie
-    st.session_state.logged_in = False
-    st.session_state.user_email = None
-    controller.remove(cookie_name)
-    st.rerun()
-
 st.title("ETHOS HUB")
 
 # --- STRATEGIC SEMESTER GOALS ---
