@@ -6,28 +6,42 @@ from utils import render_sidebar
 # --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner", page_icon="🗓️")
 
-# --- GATEKEEPER LOGIC ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("Home.py") 
     st.stop()
 
 render_sidebar()
 
-# --- CSS STYLING ---
+# --- CSS STYLING (FIXED FOR ALIGNMENT) ---
 st.markdown("""
     <style>
+    /* Column Alignment */
     [data-testid="column"] {
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start;
         min-width: 0px !important;
     }
+    
+    /* ADD Button Styling */
     div.stButton > button[kind="primary"] {
         background-color: #76b372 !important;
         border-color: #76b372 !important;
         color: white !important;
     }
+
+    /* Small Trash Button Styling */
+    .stButton > button[key^="del_"] {
+        border: none !important;
+        background: transparent !important;
+        padding: 0px !important;
+        margin-top: -10px !important; /* Pulls it up closer to checkbox */
+        height: 20px !important;
+        width: 20px !important;
+        font-size: 14px !important;
+        line-height: 1 !important;
+    }
+
     .progress-wrapper {
         width: 100%;
         height: 100px; 
@@ -40,24 +54,20 @@ st.markdown("""
     .circle-bg { fill: none; stroke: #333; stroke-width: 2.8; }
     .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
-    input { font-size: 12px !important; }
     
-    /* Style for the bin icon button to make it subtle */
-    .stButton > button[key^="del_"] {
-        padding: 0px;
-        border: none;
-        background: transparent;
+    /* Clean Container Spacing */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        margin-bottom: 5px !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- INITIALIZATION ---
 user = st.session_state.user_email
 st.title("🗓️ Weekly Planner")
 start_date = st.date_input("Week Starting (Monday)", datetime.now().date() - timedelta(days=datetime.now().weekday()))
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- WEEKLY GRID RENDERING ---
+# --- WEEKLY GRID ---
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
@@ -70,14 +80,14 @@ for i, day_name in enumerate(days):
     progress_pct = int((done_tasks / total_tasks * 100)) if total_tasks > 0 else 0
     
     with cols[i]:
-        # Day Header
+        # Header
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
                 <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
-        # Circular Progress
+        # Progress
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -88,43 +98,34 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # TASK INPUT ENGINE
-        with st.container():
-            new_task = st.text_input("Add", key=f"in_{i}", label_visibility="collapsed", placeholder="+ Task")
-            if st.button("ADD", key=f"btn_{i}", use_container_width=True):
-                if new_task:
-                    execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, %s)", 
-                                  (user, i, new_task, start_date, False))
-                    st.rerun()
+        # Add Input
+        new_task = st.text_input("Add", key=f"in_{i}", label_visibility="collapsed", placeholder="+ Task")
+        if st.button("ADD", key=f"btn_{i}", use_container_width=True):
+            if new_task:
+                execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, %s)", 
+                              (user, i, new_task, start_date, False))
+                st.rerun()
 
         st.markdown("<hr style='margin:10px 0; border:0.5px solid #333;'>", unsafe_allow_html=True)
         
-        # TASK EXECUTION LIST
+        # Task List
         for tid, tname, tdone in tasks:
             with st.container(border=True):
-                # Using columns within the day card for Task Text + Checkbox + Delete Bin
-                # Adjusting ratios for tight 7-column fit
-                t_col, d_col = st.columns([0.8, 0.2])
+                # Stack Checkbox and Delete button vertically on the left, text on the right
+                c1, c2 = st.columns([0.2, 0.8])
                 
-                with t_col:
-                    if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
-                        if not tdone:
-                            execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
-                            st.rerun()
-                    else:
-                        if tdone:
-                            execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
-                            st.rerun()
-                
-                with d_col:
-                    # The Bin Emoji for Deletion
-                    if st.button("🗑️", key=f"del_{tid}", help="Delete task"):
+                with c1:
+                    # Checkbox
+                    if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
+                        execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
+                        st.rerun()
+                    
+                    # Trash Bin directly underneath the checkbox
+                    if st.button("🗑️", key=f"del_{tid}"):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
-
-# --- CLEANUP LOGIC ---
-st.markdown("---")
-if st.button("CLEAN FINISHED TASKS", use_container_width=True, type="primary"):
-    execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND week_start=%s AND is_done=True", (user, start_date))
-    st.success("Finished tasks cleared from the week.")
-    st.rerun()
+                
+                with c2:
+                    # Task Text
+                    text_style = "text-decoration: line-through; color: gray;" if tdone else "color: white;"
+                    st.markdown(f"<p style='margin:0; font-size:13px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
