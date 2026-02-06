@@ -6,6 +6,7 @@ from utils import render_sidebar
 # --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="🗓️ Weekly Planner", page_icon="🗓️")
 
+# --- GATEKEEPER LOGIC ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("Home.py") 
     st.stop()
@@ -41,9 +42,11 @@ st.markdown("""
     .percentage { fill: #76b372; font-family: sans-serif; font-size: 0.55em; text-anchor: middle; font-weight: bold; }
     input { font-size: 12px !important; }
     
-    /* Ensuring the container border looks clean */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        margin-bottom: 5px !important;
+    /* Style for the bin icon button to make it subtle */
+    .stButton > button[key^="del_"] {
+        padding: 0px;
+        border: none;
+        background: transparent;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -67,12 +70,14 @@ for i, day_name in enumerate(days):
     progress_pct = int((done_tasks / total_tasks * 100)) if total_tasks > 0 else 0
     
     with cols[i]:
+        # Day Header
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
                 <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
+        # Circular Progress
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -97,13 +102,24 @@ for i, day_name in enumerate(days):
         # TASK EXECUTION LIST
         for tid, tname, tdone in tasks:
             with st.container(border=True):
-                if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
-                    if not tdone:
-                        execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
-                        st.rerun()
-                else:
-                    if tdone:
-                        execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
+                # Using columns within the day card for Task Text + Checkbox + Delete Bin
+                # Adjusting ratios for tight 7-column fit
+                t_col, d_col = st.columns([0.8, 0.2])
+                
+                with t_col:
+                    if st.checkbox(tname.upper(), value=tdone, key=f"chk_{tid}"):
+                        if not tdone:
+                            execute_query("UPDATE weekly_planner SET is_done=True WHERE id=%s", (tid,))
+                            st.rerun()
+                    else:
+                        if tdone:
+                            execute_query("UPDATE weekly_planner SET is_done=False WHERE id=%s", (tid,))
+                            st.rerun()
+                
+                with d_col:
+                    # The Bin Emoji for Deletion
+                    if st.button("🗑️", key=f"del_{tid}", help="Delete task"):
+                        execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
 
 # --- CLEANUP LOGIC ---
