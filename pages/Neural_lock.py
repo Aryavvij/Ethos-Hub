@@ -33,15 +33,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 1. TOP ANALYTICS OVERVIEW BAR ---
-# Logic: Today's sum, Daily Avg, Weekly sum, Monthly sum
 stats_query = fetch_query("""
     SELECT 
         SUM(CASE WHEN session_date = CURRENT_DATE THEN duration_mins ELSE 0 END) as today,
-        AVG(duration_mins) OVER() as daily_avg,
+        (SELECT AVG(duration_mins) FROM focus_sessions WHERE user_email=%s) as daily_avg,
         SUM(CASE WHEN session_date >= CURRENT_DATE - INTERVAL '7 days' THEN duration_mins ELSE 0 END) as week_total,
         SUM(CASE WHEN session_date >= DATE_TRUNC('month', CURRENT_DATE) THEN duration_mins ELSE 0 END) as month_total
-    FROM focus_sessions WHERE user_email=%s LIMIT 1
-""", (user,))
+    FROM focus_sessions WHERE user_email=%s
+""", (user, user)) # We pass user twice because of the subquery
 
 s = stats_query[0] if stats_query else (0, 0, 0, 0)
 
