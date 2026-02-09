@@ -1,37 +1,82 @@
 import streamlit as st
 import hashlib
 import jwt
-from datetime import datetime, timedelta
+import datetime
+from datetime import datetime as dt, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 from streamlit_cookies_controller import CookieController
 
-# --- CONFIG & AUTH (Keep your existing JWT logic here) ---
+# --- JWT CONFIGURATION ---
+JWT_SECRET = "ethos_super_secret_key_123" 
+JWT_ALGO = "HS256"
+
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
 cookie_name = "ethos_user_token"
-JWT_SECRET = "ethos_super_secret_key_123" 
-JWT_ALGO = "HS256"
+
+def make_hashes(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
+
+def create_jwt(email):
+    payload = {
+        "email": email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=7)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 def verify_jwt(token):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
         return payload["email"]
-    except: return None
+    except:
+        return None
 
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+# --- AUTHENTICATION LOGIC ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
     try:
         token = controller.get(cookie_name)
-        email = verify_jwt(token)
-        if email:
-            st.session_state.logged_in = True
-            st.session_state.user_email = email
-    except: pass
+        if token:
+            email = verify_jwt(token)
+            if email:
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+    except:
+        pass
 
 if not st.session_state.logged_in:
-    st.info("Please Login to access Ethos.")
-    st.stop()
+    st.title("ETHOS SYSTEM ACCESS")
+    tab1, tab2 = st.tabs(["LOGIN", "SIGN UP"])
+    
+    with tab1:
+        email_in = st.text_input("Email", key="login_email")
+        pass_in = st.text_input("Password", type='password', key="login_pass")
+        if st.button("INITIATE SESSION", use_container_width=True, type="primary"):
+            res = fetch_query("SELECT password FROM users WHERE email=%s", (email_in,))
+            if res and res[0][0] == make_hashes(pass_in):
+                token = create_jwt(email_in)
+                st.session_state.logged_in = True
+                st.session_state.user_email = email_in
+                controller.set(cookie_name, token)
+                st.rerun() 
+            else:
+                st.error("Access Denied: Invalid Credentials")
+    
+    with tab2:
+        st.subheader("New Identity Registration")
+        new_email = st.text_input("Email", key="signup_email")
+        new_pass = st.text_input("Password", type='password', key="signup_pass")
+        if st.button("CREATE ACCOUNT", use_container_width=True):
+            try:
+                execute_query("INSERT INTO users (email, password) VALUES (%s, %s)", (new_email, make_hashes(new_pass)))
+                st.success("Identity Created. Proceed to Login.")
+            except:
+                st.error("Identity already exists in database.")
+    st.stop() 
+
 
 # --- INITIALIZATION ---
 user = st.session_state.user_email
