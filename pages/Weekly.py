@@ -87,8 +87,6 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
             execute_query("DELETE FROM weekly_planner WHERE id=%s", (selected_id,))
             st.rerun()
 
-st.markdown("---")
-
 # --- 7-DAY GRID RENDERING ---
 cols = st.columns(7)
 
@@ -131,9 +129,3 @@ for i, day_name in enumerate(days):
                 with t2:
                     text_style = "text-decoration: line-through; color: gray;" if tdone else "color: white;"
                     st.markdown(f"<p style='margin:0; font-size:12px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
-
-# --- CLEANUP LOGIC ---
-st.markdown("---")
-if st.button("CLEAN FINISHED TASKS", use_container_width=True, type="primary"):
-    execute_query("DELETE FROM weekly_planner WHERE user_email=%s AND week_start=%s AND is_done=True", (user, start_date))
-    st.rerun()
