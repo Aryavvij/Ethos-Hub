@@ -1,192 +1,156 @@
 import streamlit as st
 import hashlib
 import jwt
-import datetime
-from datetime import datetime as dt, timedelta
+from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 from streamlit_cookies_controller import CookieController
 
-# --- JWT CONFIGURATION ---
-JWT_SECRET = "ethos_super_secret_key_123" 
-JWT_ALGO = "HS256"
-
-st.set_page_config(layout="wide", page_title="Ethos Hub")
-
+# --- CONFIG & AUTH (Keep your existing JWT logic here) ---
+st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
 cookie_name = "ethos_user_token"
-
-def make_hashes(password):
-    return hashlib.sha256(str.encode(password)).hexdigest()
-
-def create_jwt(email):
-    payload = {
-        "email": email,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=7)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+JWT_SECRET = "ethos_super_secret_key_123" 
+JWT_ALGO = "HS256"
 
 def verify_jwt(token):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
         return payload["email"]
-    except:
-        return None
+    except: return None
 
-# --- STICKY LOGIN LOGIC (JWT & SAFETY PATCH) ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if not st.session_state.logged_in:
     try:
-        all_cookies = controller.get_all()
-        if all_cookies and cookie_name in all_cookies:
-            token = controller.get(cookie_name)
-            email = verify_jwt(token) 
-            if email:
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-    except Exception:
-        pass
+        token = controller.get(cookie_name)
+        email = verify_jwt(token)
+        if email:
+            st.session_state.logged_in = True
+            st.session_state.user_email = email
+    except: pass
 
-# --- AUTHENTICATION SECTION ---
 if not st.session_state.logged_in:
-    st.title("🛡️ Ethos System Login")
-    tab1, tab2 = st.tabs(["Login", "Sign Up"])
-    
-    with tab1:
-        email_input = st.text_input("Email")
-        password_input = st.text_input("Password", type='password')
-        if st.button("Login", use_container_width=True):
-            res = fetch_query("SELECT password FROM users WHERE email=%s", (email_input,))
-            if res and res[0][0] == make_hashes(password_input):
-                token = create_jwt(email_input) # Create the JWT
-                st.session_state.logged_in = True
-                st.session_state.user_email = email_input
-                
-                try:
-                    controller.set(cookie_name, token)
-                except:
-                    pass
-                st.rerun() 
-            else:
-                st.error("Incorrect Email or Password")
-    
-    with tab2:
-        st.subheader("Create New Account")
-        new_email = st.text_input("New Email", key="signup_email")
-        new_pass = st.text_input("New Password", type='password', key="signup_pass")
-        if st.button("Sign Up", use_container_width=True):
-            hashed_pass = make_hashes(new_pass)
-            try:
-                execute_query("INSERT INTO users (email, password) VALUES (%s, %s)", (new_email, hashed_pass))
-                st.success("Account created! Go to Login tab.")
-            except:
-                st.error("Email already exists.")
-    st.stop() 
+    st.info("Please Login to access Ethos.")
+    st.stop()
 
-# --- DASHBOARD INITIALIZATION ---
+# --- INITIALIZATION ---
 user = st.session_state.user_email
 render_sidebar()
-
-st.title("ETHOS HUB")
-
-# --- STRATEGIC SEMESTER GOALS ---
-st.markdown("### Strategic Personal Goals")
-res = fetch_query("SELECT academic, health, personal FROM semester_goals WHERE user_email=%s", (user,))
-g_acad, g_health, g_pers = res[0] if res else ("", "", "")
-
-g1, g2, g3 = st.columns(3)
-with g1:
-    with st.container(border=True):
-        st.markdown('<p style="color:#76b372; font-weight:bold; margin-bottom:5px;">Academic</p>', unsafe_allow_html=True)
-        new_acad = st.text_area("A", value=g_acad, height=100, label_visibility="collapsed", key="ac")
-with g2:
-    with st.container(border=True):
-        st.markdown('<p style="color:#76b372; font-weight:bold; margin-bottom:5px;">Health</p>', unsafe_allow_html=True)
-        new_health = st.text_area("H", value=g_health, height=100, label_visibility="collapsed", key="he")
-with g3:
-    with st.container(border=True):
-        st.markdown('<p style="color:#76b372; font-weight:bold; margin-bottom:5px;">Others</p>', unsafe_allow_html=True)
-        new_pers = st.text_area("O", value=g_pers, height=100, label_visibility="collapsed", key="ot")
-
-if st.button("Update Goals", use_container_width=True):
-    execute_query("""
-        INSERT INTO semester_goals (user_email, academic, health, personal) 
-        VALUES (%s,%s,%s,%s) 
-        ON CONFLICT (user_email) 
-        DO UPDATE SET academic=EXCLUDED.academic, health=EXCLUDED.health, personal=EXCLUDED.personal
-    """, (user, new_acad, new_health, new_pers))
-    st.success("Goals updated!")
-
-st.markdown("---")
-
-# --- DAILY BRIEFING CENTER ---
-st.markdown("### Today's Briefing")
-
-t_now = dt.now()
-t_date = t_now.date()
+now = datetime.now()
+t_date = now.date()
+t_time = now.strftime("%H:%M")
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
-b1, b2, b3 = st.columns(3)
-label_style = "margin:0; font-size:13px; color:gray; line-height:1.2; font-weight:500; text-transform:uppercase; letter-spacing:0.5px;"
 
-with b1:
-    with st.container(border=True):
-        st.markdown(f"<p style='{label_style}'>Today's Tasks</p>", unsafe_allow_html=True)
-        st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-        tasks = fetch_query("SELECT task_name FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
-        if tasks:
-            for tname in tasks:
-                st.markdown(f"<p style='margin:0 0 4px 0; font-size:15px; color:white;'>{tname[0]}</p>", unsafe_allow_html=True)
-        else:
-            st.caption("No tasks for today.")
+# --- INNOVATIVE UI STYLING ---
+st.markdown(f"""
+    <style>
+    /* Glassmorphism Card Style */
+    .ethos-card {{
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(118, 179, 114, 0.2);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: 0.3s ease-in-out;
+    }}
+    .ethos-card:hover {{
+        border: 1px solid rgba(118, 179, 114, 0.6);
+        background: rgba(118, 179, 114, 0.02);
+    }}
+    .card-label {{
+        color: #76b372;
+        font-size: 12px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 15px;
+    }}
+    .task-item {{
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }}
+    .status-pip {{
+        height: 6px; width: 6px;
+        background-color: #76b372;
+        border-radius: 50%;
+        margin-right: 10px;
+        box-shadow: 0 0 5px #76b372;
+    }}
+    .metric-val {{ font-size: 24px; font-weight: bold; color: white; }}
+    .metric-sub {{ font-size: 12px; color: gray; }}
+    </style>
+""", unsafe_allow_html=True)
 
-with b2:
-    with st.container(border=True):
-        st.markdown(f"<p style='{label_style}'>Upcoming Calendar</p>", unsafe_allow_html=True)
-        st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-        events = fetch_query("""
-            SELECT description, event_date FROM events 
-            WHERE user_email=%s AND event_date >= %s 
-            ORDER BY event_date ASC LIMIT 3
-        """, (user, t_date))
-        
-        if events:
-            for desc, edate in events:
-                st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{edate.strftime('%b %d')}</b>: {desc}</p>", unsafe_allow_html=True)
-        else:
-            st.caption("No upcoming events.")
+st.title("ETHOS COMMAND")
+st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date}")
 
-with b3:
-    with st.container(border=True):
-        st.markdown(f"<p style='{label_style}'>Trajectory Progress</p>", unsafe_allow_html=True)
-        st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
-        blueprint_tasks = fetch_query("""
-            SELECT task_description, progress FROM future_tasks 
-            WHERE user_email=%s AND progress < 100 
-            ORDER BY progress DESC LIMIT 3
-        """, (user,))
-        
-        if blueprint_tasks:
-            for desc, prog in blueprint_tasks:
-                st.markdown(f"<p style='margin:0 0 6px 0; font-size:14px;'><b>{int(prog)}%</b>: {desc.upper()}</p>", unsafe_allow_html=True)
-        else:
-            st.caption("Strategy Map Clear.")
+# --- ROW 1: THE EXECUTION LAYER ---
+r1_c1, r1_c2, r1_c3 = st.columns(3)
 
-# --- FINANCIAL STATUS ---
-st.markdown("### Financial Status")
-f1, f2 = st.columns(2)
-period = t_date.strftime("%B %Y")
+with r1_c1:
+    st.markdown('<div class="ethos-card"><div class="card-label">Protocol: Today\'s Tasks</div>', unsafe_allow_html=True)
+    tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
+    if tasks:
+        for tname, tdone in tasks[:5]: 
+            color = "gray" if tdone else "white"
+            st.markdown(f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{tname.upper()}</span></div>', unsafe_allow_html=True)
+    else: st.caption("No tasks scheduled.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-with f1:
-    with st.container(border=True):
-        budget_calc = fetch_query("SELECT SUM(COALESCE(plan, 0) - COALESCE(actual, 0)) FROM finances WHERE user_email=%s AND period=%s", (user, period))
-        rem = budget_calc[0][0] if budget_calc and budget_calc[0][0] is not None else 0
-        st.markdown(f"<p style='color:gray;margin:0;'>Remaining Budget ({period})</p><h2 style='color:#76b372;margin:0;'>₹ {rem:,.2f}</h2>", unsafe_allow_html=True)
+with r1_c2:
+    st.markdown('<div class="ethos-card"><div class="card-label">Timeline: Next Activities</div>', unsafe_allow_html=True)
+    activities = fetch_query("""
+        SELECT activity_name, start_time FROM timetable 
+        WHERE user_email=%s AND day_index=%s AND start_time > %s 
+        ORDER BY start_time ASC LIMIT 3
+    """, (user, d_idx, t_time))
+    if activities:
+        for name, start in activities:
+            st.markdown(f'<div class="task-item"><span style="color:#76b372; margin-right:10px;">{start}</span> {name.upper()}</div>', unsafe_allow_html=True)
+    else: st.caption("Timeline clear for today.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-with f2:
-    with st.container(border=True):
-        debt_calc = fetch_query("SELECT SUM(COALESCE(amount, 0) - COALESCE(paid_out, 0)) FROM debt WHERE user_email=%s", (user,))
-        net_debt = debt_calc[0][0] if debt_calc and debt_calc[0][0] is not None else 0
-        st.markdown(f"<p style='color:gray;margin:0;'>Total Net Debt</p><h2 style='color:#ff4b4b;margin:0;'>₹ {net_debt:,.2f}</h2>", unsafe_allow_html=True)
+with r1_c3:
+    st.markdown('<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>', unsafe_allow_html=True)
+    blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 3", (user,))
+    if blueprint:
+        for desc, prog in blueprint:
+            st.markdown(f'<div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:12px;"><span>{desc[:20].upper()}</span><span>{int(prog)}%</span></div><div style="background:#333; height:4px; border-radius:2px;"><div style="background:#76b372; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>', unsafe_allow_html=True)
+    else: st.caption("No active blueprint tasks.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- ROW 2: THE INTELLIGENCE LAYER ---
+r2_c1, r2_c2, r2_c3 = st.columns(3)
+
+with r2_c1:
+    st.markdown('<div class="ethos-card"><div class="card-label">Capital: Liquidity & Debt</div>', unsafe_allow_html=True)
+    period = t_date.strftime("%B %Y")
+    budget = fetch_query("SELECT SUM(plan - actual) FROM finances WHERE user_email=%s AND period=%s", (user, period))
+    rem_cash = budget[0][0] if budget and budget[0][0] else 0
+    debt = fetch_query("SELECT SUM(amount - paid_out) FROM debt WHERE user_email=%s", (user,))
+    net_debt = debt[0][0] if debt and debt[0][0] else 0
+    
+    st.markdown(f'<div class="metric-val">₹ {rem_cash:,.0f}</div><div class="metric-sub">Remaining Budget</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="margin-top:10px;" class="metric-val" style="color:#ff4b4b;">₹ {net_debt:,.0f}</div><div class="metric-sub">Net Liability</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with r2_c2:
+    st.markdown('<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>', unsafe_allow_html=True)
+    logs = fetch_query("SELECT task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s", (user, t_date))
+    if logs:
+        for tname, mins in logs:
+            st.markdown(f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;"><span>{tname.upper()}</span><span style="color:#76b372;">{mins}m</span></div>', unsafe_allow_html=True)
+    else: st.caption("No neural work logged today.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with r2_c3:
+    st.markdown('<div class="ethos-card"><div class="card-label">Calendar: Events</div>', unsafe_allow_html=True)
+    events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 3", (user, t_date))
+    if events:
+        for desc, edate in events:
+            st.markdown(f'<div class="task-item"><div class="status-pip"></div><b>{edate.strftime("%b %d")}</b>: {desc}</div>', unsafe_allow_html=True)
+    else: st.caption("Calendar clear.")
+    st.markdown('</div>', unsafe_allow_html=True)
