@@ -32,15 +32,26 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 1. TOP ANALYTICS OVERVIEW BAR ---
+# --- 1. TOP ANALYTICS OVERVIEW BAR (FIXED MATH & MONDAY RESET) ---
 stats_query = fetch_query("""
+    WITH daily_totals AS (
+        SELECT session_date, SUM(duration_mins) as total_mins
+        FROM focus_sessions
+        WHERE user_email = %s
+        GROUP BY session_date
+    )
     SELECT 
-        SUM(CASE WHEN session_date = CURRENT_DATE THEN duration_mins ELSE 0 END) as today,
-        (SELECT AVG(duration_mins) FROM focus_sessions WHERE user_email=%s) as daily_avg,
-        SUM(CASE WHEN session_date >= CURRENT_DATE - INTERVAL '7 days' THEN duration_mins ELSE 0 END) as week_total,
-        SUM(CASE WHEN session_date >= DATE_TRUNC('month', CURRENT_DATE) THEN duration_mins ELSE 0 END) as month_total
-    FROM focus_sessions WHERE user_email=%s
-""", (user, user)) 
+        (SELECT COALESCE(SUM(duration_mins), 0) FROM focus_sessions 
+         WHERE user_email = %s AND session_date = CURRENT_DATE) as today,
+        
+        (SELECT COALESCE(AVG(total_mins), 0) FROM daily_totals) as daily_avg,
+        
+        (SELECT COALESCE(SUM(duration_mins), 0) FROM focus_sessions 
+         WHERE user_email = %s AND session_date >= DATE_TRUNC('week', CURRENT_DATE)) as week_total,
+        
+        (SELECT COALESCE(SUM(duration_mins), 0) FROM focus_sessions 
+         WHERE user_email = %s AND session_date >= DATE_TRUNC('month', CURRENT_DATE)) as month_total
+""", (user, user, user, user))
 
 s = stats_query[0] if stats_query else (0, 0, 0, 0)
 
@@ -72,7 +83,6 @@ monthly_raw = fetch_query("""
 m_df = pd.DataFrame(monthly_raw, columns=["Day", "Mins"])
 m_df["Hours"] = m_df["Mins"] / 60.0
 
-# --- VISUAL MOMENTUM ---
 if not m_df.empty:
     fig_m = px.area(m_df, x="Day", y="Hours", color_discrete_sequence=['#76b372'], template="plotly_dark")
     fig_m.update_layout(
@@ -155,7 +165,6 @@ with col_timer:
 # --- 4. SESSION LOG & HISTORICAL VIEWER ---
 with col_log:
     st.subheader("Focus Logs")
-    
     log_date = st.date_input("Filter by Date", datetime.now().date())
     
     today_data = fetch_query("""
@@ -175,11 +184,7 @@ with col_log:
 
         log_df["Time Spent"] = log_df["Duration"].apply(format_duration)
 
-        st.dataframe(
-            log_df[["Objective", "Time Spent"]], 
-            use_container_width=True, 
-            hide_index=True
-        )
+        st.dataframe(log_df[["Objective", "Time Spent"]], use_container_width=True, hide_index=True)
         
         with st.expander("Delete Session"):
             session_options = {f"{row[1]} ({format_duration(row[2])})": row[0] for row in today_data}
