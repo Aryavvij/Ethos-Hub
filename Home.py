@@ -48,7 +48,7 @@ if not st.session_state.logged_in:
         pass
 
 if not st.session_state.logged_in:
-    st.title("ETHOS SYSTEM ACCESS")
+    st.title("🛡️ ETHOS SYSTEM ACCESS")
     tab1, tab2 = st.tabs(["LOGIN", "SIGN UP"])
     
     with tab1:
@@ -81,7 +81,7 @@ if not st.session_state.logged_in:
 # --- INITIALIZATION ---
 user = st.session_state.user_email
 render_sidebar()
-now = datetime.now()
+now = dt.now() 
 t_date = now.date()
 t_time = now.strftime("%H:%M")
 d_idx = t_date.weekday()
@@ -90,7 +90,6 @@ w_start = t_date - timedelta(days=d_idx)
 # --- INNOVATIVE UI STYLING ---
 st.markdown(f"""
     <style>
-    /* Glassmorphism Card Style */
     .ethos-card {{
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(118, 179, 114, 0.2);
@@ -129,7 +128,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("ETHOS COMMAND")
+st.title("🛡️ ETHOS COMMAND")
 st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date}")
 
 # --- ROW 1: THE EXECUTION LAYER ---
@@ -141,7 +140,7 @@ with r1_c1:
     if tasks:
         for tname, tdone in tasks[:5]: 
             color = "gray" if tdone else "white"
-            st.markdown(f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{tname.upper()}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{tname[0].upper()}</span></div>', unsafe_allow_html=True)
     else: st.caption("No tasks scheduled.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -154,7 +153,7 @@ with r1_c2:
     """, (user, d_idx, t_time))
     if activities:
         for name, start in activities:
-            st.markdown(f'<div class="task-item"><span style="color:#76b372; margin-right:10px;">{start}</span> {name.upper()}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="task-item"><span style="color:#76b372; margin-right:10px;">{start}</span> {name[0].upper()}</div>', unsafe_allow_html=True)
     else: st.caption("Timeline clear for today.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -163,7 +162,7 @@ with r1_c3:
     blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 3", (user,))
     if blueprint:
         for desc, prog in blueprint:
-            st.markdown(f'<div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:12px;"><span>{desc[:20].upper()}</span><span>{int(prog)}%</span></div><div style="background:#333; height:4px; border-radius:2px;"><div style="background:#76b372; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:12px;"><span>{desc[0][:20].upper()}</span><span>{int(prog[0])}%</span></div><div style="background:#333; height:4px; border-radius:2px;"><div style="background:#76b372; width:{prog[0]}%; height:4px; border-radius:2px;"></div></div></div>', unsafe_allow_html=True)
     else: st.caption("No active blueprint tasks.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -187,7 +186,7 @@ with r2_c2:
     logs = fetch_query("SELECT task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s", (user, t_date))
     if logs:
         for tname, mins in logs:
-            st.markdown(f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;"><span>{tname.upper()}</span><span style="color:#76b372;">{mins}m</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;"><span>{tname[0].upper()}</span><span style="color:#76b372;">{mins[0]}m</span></div>', unsafe_allow_html=True)
     else: st.caption("No neural work logged today.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -196,6 +195,6 @@ with r2_c3:
     events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 3", (user, t_date))
     if events:
         for desc, edate in events:
-            st.markdown(f'<div class="task-item"><div class="status-pip"></div><b>{edate.strftime("%b %d")}</b>: {desc}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="task-item"><div class="status-pip"></div><b>{edate[0].strftime("%b %d")}</b>: {desc[0]}</div>', unsafe_allow_html=True)
     else: st.caption("Calendar clear.")
     st.markdown('</div>', unsafe_allow_html=True)
