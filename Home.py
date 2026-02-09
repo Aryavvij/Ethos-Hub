@@ -10,6 +10,7 @@ from streamlit_cookies_controller import CookieController
 # --- JWT CONFIGURATION ---
 JWT_SECRET = "ethos_super_secret_key_123" 
 JWT_ALGO = "HS256"
+ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
@@ -49,6 +50,17 @@ if not st.session_state.logged_in:
 
 if not st.session_state.logged_in:
     st.title("🛡️ ETHOS SYSTEM ACCESS")
+    
+    st.markdown(f"""
+        <style>
+        div.stButton > button[kind="primary"] {{
+            background-color: {ETHOS_GREEN};
+            border-color: {ETHOS_GREEN};
+            color: white;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
+
     tab1, tab2 = st.tabs(["LOGIN", "SIGN UP"])
     
     with tab1:
@@ -103,7 +115,7 @@ st.markdown(f"""
         background: rgba(118, 179, 114, 0.02);
     }}
     .card-label {{
-        color: #76b372;
+        color: {ETHOS_GREEN};
         font-size: 12px;
         font-weight: bold;
         text-transform: uppercase;
@@ -118,10 +130,10 @@ st.markdown(f"""
     }}
     .status-pip {{
         height: 6px; width: 6px;
-        background-color: #76b372;
+        background-color: {ETHOS_GREEN};
         border-radius: 50%;
         margin-right: 10px;
-        box-shadow: 0 0 5px #76b372;
+        box-shadow: 0 0 5px {ETHOS_GREEN};
     }}
     .metric-val {{ font-size: 24px; font-weight: bold; color: white; }}
     .metric-sub {{ font-size: 12px; color: gray; }}
@@ -138,9 +150,10 @@ with r1_c1:
     st.markdown('<div class="ethos-card"><div class="card-label">Protocol: Today\'s Tasks</div>', unsafe_allow_html=True)
     tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
     if tasks:
-        for tname, tdone in tasks[:5]: 
+        for row in tasks[:5]: 
+            tname, tdone = row[0], row[1]
             color = "gray" if tdone else "white"
-            st.markdown(f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{tname[0].upper()}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{str(tname).upper()}</span></div>', unsafe_allow_html=True)
     else: st.caption("No tasks scheduled.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -152,8 +165,9 @@ with r1_c2:
         ORDER BY start_time ASC LIMIT 3
     """, (user, d_idx, t_time))
     if activities:
-        for name, start in activities:
-            st.markdown(f'<div class="task-item"><span style="color:#76b372; margin-right:10px;">{start}</span> {name[0].upper()}</div>', unsafe_allow_html=True)
+        for row in activities:
+            name, start = row[0], row[1]
+            st.markdown(f'<div class="task-item"><span style="color:{ETHOS_GREEN}; margin-right:10px;">{start}</span> {str(name).upper()}</div>', unsafe_allow_html=True)
     else: st.caption("Timeline clear for today.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -161,8 +175,18 @@ with r1_c3:
     st.markdown('<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>', unsafe_allow_html=True)
     blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 3", (user,))
     if blueprint:
-        for desc, prog in blueprint:
-            st.markdown(f'<div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:12px;"><span>{desc[0][:20].upper()}</span><span>{int(prog[0])}%</span></div><div style="background:#333; height:4px; border-radius:2px;"><div style="background:#76b372; width:{prog[0]}%; height:4px; border-radius:2px;"></div></div></div>', unsafe_allow_html=True)
+        for row in blueprint:
+            desc, prog = row[0], row[1]
+            val = int(prog[0]) if isinstance(prog, (list, tuple)) else int(prog)
+            st.markdown(f'''
+                <div style="margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; font-size:12px;">
+                        <span>{str(desc)[:20].upper()}</span><span>{val}%</span>
+                    </div>
+                    <div style="background:#333; height:4px; border-radius:2px;">
+                        <div style="background:{ETHOS_GREEN}; width:{val}%; height:4px; border-radius:2px;"></div>
+                    </div>
+                </div>''', unsafe_allow_html=True)
     else: st.caption("No active blueprint tasks.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -178,15 +202,17 @@ with r2_c1:
     net_debt = debt[0][0] if debt and debt[0][0] else 0
     
     st.markdown(f'<div class="metric-val">₹ {rem_cash:,.0f}</div><div class="metric-sub">Remaining Budget</div>', unsafe_allow_html=True)
-    st.markdown(f'<div style="margin-top:10px;" class="metric-val" style="color:#ff4b4b;">₹ {net_debt:,.0f}</div><div class="metric-sub">Net Liability</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="margin-top:10px; color:#ff4b4b;" class="metric-val">₹ {net_debt:,.0f}</div><div class="metric-sub">Net Liability</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with r2_c2:
     st.markdown('<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>', unsafe_allow_html=True)
     logs = fetch_query("SELECT task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s", (user, t_date))
     if logs:
-        for tname, mins in logs:
-            st.markdown(f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;"><span>{tname[0].upper()}</span><span style="color:#76b372;">{mins[0]}m</span></div>', unsafe_allow_html=True)
+        for row in logs:
+            tname, mins = row[0], row[1]
+            m_val = mins[0] if isinstance(mins, (list, tuple)) else mins
+            st.markdown(f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;"><span>{str(tname).upper()}</span><span style="color:{ETHOS_GREEN};">{m_val}m</span></div>', unsafe_allow_html=True)
     else: st.caption("No neural work logged today.")
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -194,7 +220,9 @@ with r2_c3:
     st.markdown('<div class="ethos-card"><div class="card-label">Calendar: Events</div>', unsafe_allow_html=True)
     events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 3", (user, t_date))
     if events:
-        for desc, edate in events:
-            st.markdown(f'<div class="task-item"><div class="status-pip"></div><b>{edate[0].strftime("%b %d")}</b>: {desc[0]}</div>', unsafe_allow_html=True)
+        for row in events:
+            desc, edate = row[0], row[1]
+            date_display = edate[0].strftime("%b %d") if isinstance(edate, (list, tuple)) else edate.strftime("%b %d")
+            st.markdown(f'<div class="task-item"><div class="status-pip"></div><b>{date_display}</b>: {desc}</div>', unsafe_allow_html=True)
     else: st.caption("Calendar clear.")
     st.markdown('</div>', unsafe_allow_html=True)
