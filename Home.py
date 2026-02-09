@@ -1,9 +1,15 @@
 import streamlit as st
 import hashlib
-from datetime import datetime, timedelta  
+import jwt
+import datetime
+from datetime import datetime as dt, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 from streamlit_cookies_controller import CookieController
+
+# --- JWT CONFIGURATION ---
+JWT_SECRET = "ethos_super_secret_key_123" 
+JWT_ALGO = "HS256"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub")
 
@@ -13,7 +19,21 @@ cookie_name = "ethos_user_token"
 def make_hashes(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- STICKY LOGIN LOGIC (WITH SAFETY PATCH) ---
+def create_jwt(email):
+    payload = {
+        "email": email,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=7)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+def verify_jwt(token):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+        return payload["email"]
+    except:
+        return None
+
+# --- STICKY LOGIN LOGIC (JWT & SAFETY PATCH) ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -21,10 +41,11 @@ if not st.session_state.logged_in:
     try:
         all_cookies = controller.get_all()
         if all_cookies and cookie_name in all_cookies:
-            saved_user = controller.get(cookie_name)
-            if saved_user:
+            token = controller.get(cookie_name)
+            email = verify_jwt(token) 
+            if email:
                 st.session_state.logged_in = True
-                st.session_state.user_email = saved_user
+                st.session_state.user_email = email
     except Exception:
         pass
 
@@ -34,15 +55,19 @@ if not st.session_state.logged_in:
     tab1, tab2 = st.tabs(["Login", "Sign Up"])
     
     with tab1:
-        email = st.text_input("Email")
-        password = st.text_input("Password", type='password')
+        email_input = st.text_input("Email")
+        password_input = st.text_input("Password", type='password')
         if st.button("Login", use_container_width=True):
-            res = fetch_query("SELECT password FROM users WHERE email=%s", (email,))
-            if res and res[0][0] == make_hashes(password):
+            res = fetch_query("SELECT password FROM users WHERE email=%s", (email_input,))
+            if res and res[0][0] == make_hashes(password_input):
+                token = create_jwt(email_input) # Create the JWT
                 st.session_state.logged_in = True
-                st.session_state.user_email = email
+                st.session_state.user_email = email_input
                 
-                controller.set(cookie_name, email)
+                try:
+                    controller.set(cookie_name, token)
+                except:
+                    pass
                 st.rerun() 
             else:
                 st.error("Incorrect Email or Password")
@@ -99,7 +124,8 @@ st.markdown("---")
 # --- DAILY BRIEFING CENTER ---
 st.markdown("### Today's Briefing")
 
-t_date = datetime.now().date()
+t_now = dt.now()
+t_date = t_now.date()
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 b1, b2, b3 = st.columns(3)
