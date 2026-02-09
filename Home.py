@@ -149,79 +149,85 @@ st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date}")
 r1_c1, r1_c2, r1_c3 = st.columns(3)
 
 with r1_c1:
-    st.markdown(f'<div class="ethos-card"><div class="card-label">Protocol: Today\'s Tasks</div>', unsafe_allow_html=True)
     tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
+    content = ""
     if tasks:
-        for row in tasks[:5]:
-            tname, tdone = row[0], row[1]
+        for tname, tdone in tasks[:5]: 
             color = "gray" if tdone else "white"
-            st.markdown(f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{str(tname).upper()}</span></div>', unsafe_allow_html=True)
-    else: st.caption("No tasks scheduled.")
-    st.markdown('</div>', unsafe_allow_html=True)
+            content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{tname[0].upper()}</span></div>'
+    else:
+        content = '<p style="color:gray; font-size:12px;">No tasks scheduled.</p>'
+    
+    st.markdown(f'<div class="ethos-card"><div class="card-label">Protocol: Today\'s Tasks</div>{content}</div>', unsafe_allow_html=True)
 
 with r1_c2:
-    st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Next Activities</div>', unsafe_allow_html=True)
     activities = fetch_query("""
-        SELECT task_name, start_time FROM timetable 
+        SELECT activity_name, start_time FROM timetable 
         WHERE user_email=%s AND day_index=%s AND start_time > %s 
         ORDER BY start_time ASC LIMIT 3
     """, (user, d_idx, t_time))
+    content = ""
     if activities:
-        for row in activities:
-            st.markdown(f'<div class="task-item"><span style="color:{ETHOS_GREEN}; font-weight:bold; margin-right:12px;">{row[1]}</span> {str(row[0]).upper()}</div>', unsafe_allow_html=True)
-    else: st.caption("Timeline clear.")
-    st.markdown('</div>', unsafe_allow_html=True)
+        for name, start in activities:
+            content += f'<div class="task-item"><span style="color:#76b372; margin-right:10px;">{start}</span> {name[0].upper()}</div>'
+    else:
+        content = '<p style="color:gray; font-size:12px;">Timeline clear.</p>'
+    
+    st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Next Activities</div>{content}</div>', unsafe_allow_html=True)
 
 with r1_c3:
-    st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>', unsafe_allow_html=True)
     blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 3", (user,))
+    content = ""
     if blueprint:
-        for row in blueprint:
-            desc, prog = row[0], int(row[1])
-            st.markdown(f'''
+        for desc, prog in blueprint:
+            content += f'''
                 <div style="margin-bottom:12px;">
-                    <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:5px;">
-                        <span>{str(desc)[:20].upper()}</span><span>{prog}%</span>
+                    <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+                        <span>{desc[0][:20].upper()}</span><span>{int(prog[0])}%</span>
                     </div>
                     <div style="background:#333; height:4px; border-radius:2px;">
-                        <div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div>
+                        <div style="background:#76b372; width:{prog[0]}%; height:4px; border-radius:2px;"></div>
                     </div>
-                </div>''', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+                </div>'''
+    else:
+        content = '<p style="color:gray; font-size:12px;">No active path.</p>'
+        
+    st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>{content}</div>', unsafe_allow_html=True)
 
 # --- ROW 2: THE INTELLIGENCE LAYER ---
 r2_c1, r2_c2, r2_c3 = st.columns(3)
 
 with r2_c1:
-    st.markdown(f'<div class="ethos-card"><div class="card-label">Capital: Liquidity & Debt</div>', unsafe_allow_html=True)
     period = t_date.strftime("%B %Y")
     budget = fetch_query("SELECT SUM(plan - actual) FROM finances WHERE user_email=%s AND period=%s", (user, period))
     rem_cash = budget[0][0] if budget and budget[0][0] else 0
     debt = fetch_query("SELECT SUM(amount - paid_out) FROM debt WHERE user_email=%s", (user,))
     net_debt = debt[0][0] if debt and debt[0][0] else 0
     
-    m1, m2 = st.columns(2)
-    with m1:
-        st.markdown(f'<div class="metric-val" style="color:{ETHOS_GREEN};">₹{rem_cash:,.0f}</div><div class="metric-sub">Budget</div>', unsafe_allow_html=True)
-    with m2:
-        st.markdown(f'<div class="metric-val" style="color:#ff4b4b;">₹{net_debt:,.0f}</div><div class="metric-sub">Liability</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    content = f'''
+        <div class="metric-val">₹ {rem_cash:,.0f}</div><div class="metric-sub">Remaining Budget</div>
+        <div style="margin-top:15px;" class="metric-val" style="color:#ff4b4b;">₹ {net_debt:,.0f}</div><div class="metric-sub">Net Liability</div>
+    '''
+    st.markdown(f'<div class="ethos-card"><div class="card-label">Capital: Liquidity & Debt</div>{content}</div>', unsafe_allow_html=True)
 
 with r2_c2:
-    st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>', unsafe_allow_html=True)
     logs = fetch_query("SELECT task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s", (user, t_date))
+    content = ""
     if logs:
-        for row in logs:
-            st.markdown(f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span>{str(row[0]).upper()}</span><span style="color:{ETHOS_GREEN}; font-weight:bold;">{row[1]}m</span></div>', unsafe_allow_html=True)
-    else: st.caption("No focus work logged.")
-    st.markdown('</div>', unsafe_allow_html=True)
+        for tname, mins in logs:
+            content += f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span>{tname[0].upper()}</span><span style="color:#76b372;">{mins[0]}m</span></div>'
+    else:
+        content = '<p style="color:gray; font-size:12px;">No output logged.</p>'
+        
+    st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content}</div>', unsafe_allow_html=True)
 
 with r2_c3:
-    st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Events</div>', unsafe_allow_html=True)
     events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 3", (user, t_date))
+    content = ""
     if events:
-        for row in events:
-            date_str = row[1].strftime("%b %d")
-            st.markdown(f'<div class="task-item"><div class="status-pip"></div><b>{date_str}</b>: {str(row[0])}</div>', unsafe_allow_html=True)
-    else: st.caption("No upcoming events.")
-    st.markdown('</div>', unsafe_allow_html=True)
+        for desc, edate in events:
+            content += f'<div class="task-item"><div class="status-pip"></div><b>{edate[0].strftime("%b %d")}</b>: {desc[0]}</div>'
+    else:
+        content = '<p style="color:gray; font-size:12px;">Calendar clear.</p>'
+        
+    st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Events</div>{content}</div>', unsafe_allow_html=True)
