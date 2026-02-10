@@ -5,10 +5,11 @@ import datetime
 from datetime import datetime as dt, timedelta
 from database import fetch_query, execute_query
 from utils import render_sidebar
+from services import FocusService, FinanceService
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
 
-# --- 1. DATA SCHEMAS (Pydantic) ---
+# --- 1. DATA SCHEMAS ---
 class TaskSchema(BaseModel):
     name: str
     is_done: bool = False
@@ -46,6 +47,24 @@ if not st.session_state.logged_in:
             st.session_state.user_email = email
 
 if not st.session_state.logged_in:
+    st.markdown(f"""
+        <style>
+        div.stButton > button[kind="primary"] {{
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(118, 179, 114, 0.2) !important;
+            color: white !important;
+            border-radius: 8px !important;
+            font-weight: 400 !important;
+            height: 3rem !important;
+            transition: all 0.3s ease !important;
+        }}
+        div.stButton > button[kind="primary"]:hover {{
+            border-color: {ETHOS_GREEN} !important;
+            background-color: rgba(118, 179, 114, 0.05) !important;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
+
     st.title("ETHOS SYSTEM ACCESS")
     t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
     with t1:
@@ -93,7 +112,6 @@ st.title("ETHOS COMMAND")
 st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date}")
 
 # --- 6. GRID LAYOUT ---
-
 r1_c1, r1_c2, r1_c3 = st.columns(3)
 
 with r1_c1: # PROTOCOL CARD
@@ -123,18 +141,15 @@ with r1_c3: # BLUEPRINT CARD
 
 r2_c1, r2_c2, r2_c3 = st.columns(3)
 
-with r2_c1: # FINANCIAL CARD
-    budget = fetch_query("SELECT SUM(plan - actual) FROM finances WHERE user_email=%s AND period=%s", (user, t_date.strftime("%B %Y")))
-    debt = fetch_query("SELECT SUM(amount - paid_out) FROM debt WHERE user_email=%s", (user,))
-    rem = budget[0][0] if budget and budget[0][0] is not None else 0
-    liab = debt[0][0] if debt and debt[0][0] is not None else 0
+with r2_c1: # FINANCIAL CARD (Service-Powered)
+    fin_metrics = FinanceService.get_dashboard_metrics(user, t_date.strftime("%B %Y"))
     st.markdown(f'''<div class="ethos-card"><div class="card-label">Financial: Budget & Debt</div>
-                <div class="metric-val">₹ {rem:,.0f}</div><div class="metric-sub">Remaining Budget</div>
-                <div style="margin-top:15px;" class="metric-val" style="color:#ff4b4b;">₹ {liab:,.0f}</div><div class="metric-sub">Net Liability</div></div>''', unsafe_allow_html=True)
+                <div class="metric-val">₹ {fin_metrics.remaining_budget:,.0f}</div><div class="metric-sub">Remaining Budget</div>
+                <div style="margin-top:15px;" class="metric-val" style="color:#ff4b4b;">₹ {fin_metrics.net_debt:,.0f}</div><div class="metric-sub">Net Liability</div></div>''', unsafe_allow_html=True)
 
-with r2_c2: # NEURAL LOCK CARD
-    logs = fetch_query("SELECT task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s", (user, t_date))
-    content = "".join([f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span>{row[0].upper()}</span><span style="color:{ETHOS_GREEN};">{row[1]}m</span></div>' for row in logs])
+with r2_c2: # NEURAL LOCK CARD (Service-Powered)
+    logs = FocusService.get_daily_logs(user, t_date)
+    content = "".join([f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span>{row.task_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>' for row in logs])
     st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
 
 with r2_c3: # EVENTS CARD
