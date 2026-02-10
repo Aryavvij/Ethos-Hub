@@ -41,7 +41,7 @@ def verify_jwt(token):
     except:
         return None, False
 
-# --- 4. UPDATED AUTHENTICATION FLOW ---
+# --- 4. AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -52,6 +52,7 @@ if not st.session_state.logged_in:
         if email:
             st.session_state.logged_in = True
             st.session_state.user_email = email
+            
             if refresh_needed:
                 controller.set(cookie_name, create_jwt(email))
 
