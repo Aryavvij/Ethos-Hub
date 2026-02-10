@@ -23,28 +23,39 @@ st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
 cookie_name = "ethos_user_token"
 
-# --- 3. AUTH UTILITIES ---
+# --- 3. UPDATED AUTH UTILITIES (Sliding Window) ---
 def verify_jwt(token):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-        return payload["email"]
-    except: return None
+        email = payload["email"]
+        exp_timestamp = payload.get('exp')
+        current_ts = dt.utcnow().timestamp()
+        needs_refresh = (exp_timestamp - current_ts) < (5 * 86400) 
+        
+        return email, needs_refresh
+    except:
+        return None, False
 
 def create_jwt(email):
-    payload = {"email": email, "exp": dt.utcnow() + timedelta(days=7)}
+    payload = {
+        "email": email, 
+        "exp": dt.utcnow() + timedelta(days=30) 
+    }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
-# --- 4. AUTHENTICATION FLOW ---
+# --- 4. UPDATED AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
     token = controller.get(cookie_name)
     if token:
-        email = verify_jwt(token)
+        email, refresh_needed = verify_jwt(token)
         if email:
             st.session_state.logged_in = True
             st.session_state.user_email = email
+            if refresh_needed:
+                controller.set(cookie_name, create_jwt(email))
 
 if not st.session_state.logged_in:
     st.markdown(f"""
