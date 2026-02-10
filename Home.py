@@ -24,24 +24,22 @@ controller = CookieController()
 cookie_name = "ethos_user_token"
 
 # --- 3. UPDATED AUTH UTILITIES (Sliding Window) ---
-def verify_jwt(token):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-        email = payload["email"]
-        exp_timestamp = payload.get('exp')
-        current_ts = dt.utcnow().timestamp()
-        needs_refresh = (exp_timestamp - current_ts) < (5 * 86400) 
-        
-        return email, needs_refresh
-    except:
-        return None, False
-
 def create_jwt(email):
     payload = {
         "email": email, 
         "exp": dt.utcnow() + timedelta(days=30) 
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+def verify_jwt(token):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+        email = payload["email"]
+        exp_ts = payload.get('exp')
+        needs_refresh = (exp_ts - dt.utcnow().timestamp()) < (5 * 86400)
+        return email, needs_refresh
+    except:
+        return None, False
 
 # --- 4. UPDATED AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
