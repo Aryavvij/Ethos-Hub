@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from database import execute_query, fetch_query
 from utils import render_sidebar
 
-# --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Weekly Planner", page_icon="🗓️")
 
 # --- GATEKEEPER ---
@@ -21,24 +20,27 @@ days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 # --- CSS STYLING (The Alignment Fix) ---
 st.markdown("""
     <style>
-    /* 1. Force the checkbox and label to align perfectly */
+    /* 1. Force checkbox and text to share a horizontal centerline */
     [data-testid="stCheckbox"] {
         display: flex !important;
         align-items: center !important;
-        justify-content: center !important;
-        padding: 0 !important;
         margin: 0 !important;
-        height: 100% !important;
+        padding: 0 !important;
     }
     
     [data-testid="stCheckbox"] > label {
         display: flex !important;
         align-items: center !important;
         margin-bottom: 0px !important;
-        padding: 0 !important;
     }
 
-    /* 2. Custom Progress Circle Styling */
+    /* 2. Slim down the container padding for the 7-day grid */
+    [data-testid="stVerticalBlock"] > div {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }
+
+    /* 3. Circular Progress Chart Styling */
     .progress-wrapper {
         display: flex;
         justify-content: center;
@@ -47,18 +49,19 @@ st.markdown("""
     .circular-chart {
         display: block;
         margin: 10px auto;
-        max-width: 60px;
-        max-height: 60px;
+        max-width: 55px;
+        max-height: 55px;
     }
     .circle-bg { fill: none; stroke: #333; stroke-width: 3.8; }
     .circle { fill: none; stroke-width: 2.8; stroke: #76b372; stroke-linecap: round; transition: stroke-dasharray 0.3s ease; }
     
-    /* 3. Task Container Styling */
-    .task-row {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 2px 0;
+    /* 4. Task Row optical centering */
+    .task-text {
+        margin: 0 !important; 
+        font-size: 11px !important; 
+        font-weight: bold !important; 
+        line-height: 1.2 !important;
+        padding-top: 3px; /* Micro-adjustment to center text with checkbox */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -95,9 +98,9 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
             execute_query("DELETE FROM weekly_planner WHERE id=%s", (selected_id,))
             st.rerun()
 
-st.markdown("---")
 
 # --- 7-DAY GRID RENDERING ---
+
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
@@ -110,10 +113,10 @@ for i, day_name in enumerate(days):
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
-        # Header for the Day
+        # Day Header
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
-                <strong style="font-size: 14px;">{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
+                <strong style="font-size: 13px;">{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
@@ -123,23 +126,29 @@ for i, day_name in enumerate(days):
                 <svg viewBox="0 0 36 36" class="circular-chart">
                     <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
                     <path class="circle" stroke-dasharray="{pct}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    <text x="18" y="20.5" style="fill:#76b372; font-size:8px; text-anchor:middle; font-weight:bold;">{pct}%</text>
+                    <text x="18" y="20.5" style="fill:#76b372; font-size:9px; text-anchor:middle; font-weight:bold;">{pct}%</text>
                 </svg>
             </div>
         """, unsafe_allow_html=True)
         
         # Task Execution List
         for tid, tname, tdone in day_tasks:
-            # Container for the task row
+            # We use a slim container for each task entry
             with st.container(border=True):
-                # We use specific column ratios to force the checkbox and text together
-                t_col1, t_col2 = st.columns([0.25, 0.75])
+                t_c1, t_c2 = st.columns([0.25, 0.75])
                 
-                with t_col1:
-                    if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
-                        execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
+                with t_c1:
+                    # Logic Fix: Capture the new value from the checkbox and update
+                    new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
+                    if new_val != tdone:
+                        execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (new_val, tid))
+                        # Invalidate cache if you're using the service layer on Home.py
+                        try:
+                            from services import invalidate_user_caches
+                            invalidate_user_caches()
+                        except: pass
                         st.rerun()
                 
-                with t_col2:
-                    text_style = "text-decoration: line-through; color: gray;" if tdone else "color: white;"
-                    st.markdown(f"<p style='margin:0; font-size:11px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
+                with t_c2:
+                    text_style = "text-decoration: line-through; color: #555;" if tdone else "color: white;"
+                    st.markdown(f"<p class='task-text' style='{text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
