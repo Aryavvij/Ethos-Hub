@@ -133,16 +133,13 @@ for i, day_name in enumerate(days):
         
         # Task Execution List
         for tid, tname, tdone in day_tasks:
-            # We use a slim container for each task entry
             with st.container(border=True):
                 t_c1, t_c2 = st.columns([0.25, 0.75])
                 
                 with t_c1:
-                    # Logic Fix: Capture the new value from the checkbox and update
                     new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
                     if new_val != tdone:
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (new_val, tid))
-                        # Invalidate cache if you're using the service layer on Home.py
                         try:
                             from services import invalidate_user_caches
                             invalidate_user_caches()
