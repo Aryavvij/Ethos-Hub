@@ -1,0 +1,13 @@
+name: Delayed Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for 3 minutes
+        run: sleep 120
+      - name: Trigger Render Deploy
+        run: curl -X POST https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}
