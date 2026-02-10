@@ -21,7 +21,6 @@ now = dt.now()
 t_date = now.date()
 st.title("🔒 Neural Lock")
 st.caption(f"Protocol Active for {t_date.strftime('%A, %b %d, %Y')}")
-g
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
