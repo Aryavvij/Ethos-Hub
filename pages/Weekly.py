@@ -13,40 +13,55 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
-# --- CSS STYLING ---
-st.markdown("""
-    <style>
-    /* Force the checkbox and label to align perfectly */
-    [data-testid="stCheckbox"] {
-        display: flex;
-        align-items: center;
-        padding: 5px 0;
-    }
-    
-    [data-testid="stCheckbox"] > label {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0px !important; /* Remove Streamlit's default bottom margin */
-        gap: 12px; /* Space between box and text */
-    }
-
-    /* Target the text inside the checkbox label */
-    [data-testid="stWidgetLabel"] p {
-        font-size: 15px !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        padding-top: 2px; /* Micro-adjustment for optical centering */
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-for task in tasks:
-    is_checked = st.checkbox(task.name.upper(), value=task.is_done, key=f"task_{task.id}")
-
 # --- INITIALIZATION ---
 user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# --- CSS STYLING (The Alignment Fix) ---
+st.markdown("""
+    <style>
+    /* 1. Force the checkbox and label to align perfectly */
+    [data-testid="stCheckbox"] {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: 100% !important;
+    }
+    
+    [data-testid="stCheckbox"] > label {
+        display: flex !important;
+        align-items: center !important;
+        margin-bottom: 0px !important;
+        padding: 0 !important;
+    }
+
+    /* 2. Custom Progress Circle Styling */
+    .progress-wrapper {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0;
+    }
+    .circular-chart {
+        display: block;
+        margin: 10px auto;
+        max-width: 60px;
+        max-height: 60px;
+    }
+    .circle-bg { fill: none; stroke: #333; stroke-width: 3.8; }
+    .circle { fill: none; stroke-width: 2.8; stroke: #76b372; stroke-linecap: round; transition: stroke-dasharray 0.3s ease; }
+    
+    /* 3. Task Container Styling */
+    .task-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 2px 0;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("🗓️ Weekly Planner")
 
@@ -80,25 +95,29 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
             execute_query("DELETE FROM weekly_planner WHERE id=%s", (selected_id,))
             st.rerun()
 
+st.markdown("---")
+
 # --- 7-DAY GRID RENDERING ---
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
     this_date = start_date + timedelta(days=i)
-    tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
+    day_tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", 
                         (user, i, start_date))
     
-    total = len(tasks)
-    done = sum(1 for t in tasks if t[2])
+    total = len(day_tasks)
+    done = sum(1 for t in day_tasks if t[2])
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
+        # Header for the Day
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
-                <strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
+                <strong style="font-size: 14px;">{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
+        # Circular Progress Chart
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -109,16 +128,18 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # --- TASK EXECUTION LIST (Clean: No Bin) ---
-        for tid, tname, tdone in tasks:
+        # Task Execution List
+        for tid, tname, tdone in day_tasks:
+            # Container for the task row
             with st.container(border=True):
-                t1, t2 = st.columns([0.2, 0.8])
+                # We use specific column ratios to force the checkbox and text together
+                t_col1, t_col2 = st.columns([0.25, 0.75])
                 
-                with t1:
+                with t_col1:
                     if st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed"):
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (not tdone, tid))
                         st.rerun()
                 
-                with t2:
+                with t_col2:
                     text_style = "text-decoration: line-through; color: gray;" if tdone else "color: white;"
-                    st.markdown(f"<p style='margin:0; font-size:12px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p style='margin:0; font-size:11px; font-weight:bold; {text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
