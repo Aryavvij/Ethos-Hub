@@ -16,39 +16,32 @@ render_sidebar()
 # --- CSS STYLING ---
 st.markdown("""
     <style>
-    /* Global Column Alignment */
-    [data-testid="column"] { 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
+    /* Force the checkbox and label to align perfectly */
+    [data-testid="stCheckbox"] {
+        display: flex;
+        align-items: center;
+        padding: 5px 0;
     }
     
-    /* ADD Button Styling */
-    div.stButton > button[kind="primary"] {
-        background-color: #76b372 !important;
-        border-color: #76b372 !important;
-        color: white !important;
+    [data-testid="stCheckbox"] > label {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0px !important; /* Remove Streamlit's default bottom margin */
+        gap: 12px; /* Space between box and text */
     }
 
-    /* Progress Ring Styling */
-    .progress-wrapper { 
-        width: 100%; 
-        height: 80px; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        margin-bottom: 10px;
-    }
-    .circular-chart { width: 60px; height: 60px; }
-    .circle-bg { fill: none; stroke: #333; stroke-width: 2.8; }
-    .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; stroke: #76b372; }
-    
-    /* Card Container Spacing */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        margin-bottom: 3px !important;
+    /* Target the text inside the checkbox label */
+    [data-testid="stWidgetLabel"] p {
+        font-size: 15px !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+        padding-top: 2px; /* Micro-adjustment for optical centering */
     }
     </style>
 """, unsafe_allow_html=True)
+
+for task in tasks:
+    is_checked = st.checkbox(task.name.upper(), value=task.is_done, key=f"task_{task.id}")
 
 # --- INITIALIZATION ---
 user = st.session_state.user_email
