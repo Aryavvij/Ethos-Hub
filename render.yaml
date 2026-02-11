@@ -2,7 +2,7 @@ services:
   - type: web
     name: ethos-hub-docker
     runtime: docker 
-    repo: YOUR_GITHUB_REPO_URL
+    repo: https://github.com/Aryavvij/Ethos-Hub/tree/main
     envVars:
       - key: DATABASE_URL
         sync: false
