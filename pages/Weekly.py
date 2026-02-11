@@ -17,20 +17,31 @@ user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- CSS STYLING (The Alignment Fix) ---
+# --- CSS STYLING (The Alignment & UI Fixes) ---
 st.markdown("""
     <style>
-    /* 1. Circular Chart Styling */
+    /* 1. Header & Circular Chart Scaling */
+    .day-header {
+        background: #76b372; 
+        padding: 10px; 
+        border-radius: 8px; 
+        text-align: center; 
+        color: white; 
+        margin-bottom: 5px;
+    }
+    .day-header strong { font-size: 18px !important; }
+    .day-header small { font-size: 14px !important; opacity: 0.9; }
+
     .progress-wrapper {
         display: flex;
         justify-content: center;
-        padding: 10px 0;
+        padding: 5px 0 15px 0;
     }
     .circular-chart {
         display: block;
-        margin: 10px auto;
-        max-width: 55px;
-        max-height: 55px;
+        margin: 0 auto;
+        max-width: 65px;
+        max-height: 65px;
     }
     .circle-bg { fill: none; stroke: #333; stroke-width: 3.8; }
     .circle { 
@@ -41,30 +52,41 @@ st.markdown("""
         transition: stroke-dasharray 0.3s ease; 
     }
     
-    /* 2. Checkbox Scaling & Alignment */
-    [data-testid="stCheckbox"] [data-testid="stWidgetLabel"] span {
-        transform: scale(0.9);
-        margin-right: -2px;
+    /* 2. Task Box Vertical Centering (The Fix) */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        height: 100%;
     }
+    /* This targets the column inside each task container to center the checkbox vertically */
+    [data-testid="column"] {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* 3. Checkbox & Font Scaling */
     [data-testid="stCheckbox"] {
         display: flex !important;
         align-items: center !important;
-        padding: 5px 0 !important;
+        justify-content: center !important;
     }
-    [data-testid="stCheckbox"] label {
-        display: flex !important;
-        align-items: center !important;
-        gap: 14px !important;
+    
+    .task-text {
+        font-size: 17px !important; 
+        font-weight: 800 !important;
+        line-height: 1.3 !important;
+        margin: 0 !important;
+        color: white;
     }
 
-    /* 3. Bold Task Text */
-    .task-text {
-        font-size: 15px !important; 
-        font-weight: 800 !important;
-        line-height: 1.2 !important;
-        margin: 0 !important;
-        padding-top: 1px !important;
-        color: white;
+    /* 4. Button Color Override (Making 'Add' match others) */
+    div.stButton > button:first-child {
+        background-color: transparent !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+    div.stButton > button:hover {
+        border-color: #76b372 !important;
+        color: #76b372 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -79,10 +101,9 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
     task_input = c2.text_input("New Task Description", placeholder="Enter task name here...")
     
     existing_tasks = fetch_query("SELECT id, task_name FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, day_idx, start_date))
-    
+
     btn_col1, btn_col2, btn_col3 = st.columns(3)
-    
-    if btn_col1.button("ADD TASK", use_container_width=True, type="primary"):
+    if btn_col1.button("ADD TASK", use_container_width=True):
         if task_input:
             execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, False)", (user, day_idx, task_input, start_date))
             st.rerun()
@@ -101,9 +122,7 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
             execute_query("DELETE FROM weekly_planner WHERE id=%s", (selected_id,))
             st.rerun()
 
-
 # --- 7-DAY GRID RENDERING ---
-
 cols = st.columns(7)
 
 for i, day_name in enumerate(days):
@@ -116,12 +135,15 @@ for i, day_name in enumerate(days):
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
+        # Bigger Date Headers
         st.markdown(f"""
-            <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
-                <strong style="font-size: 13px;">{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
+            <div class="day-header">
+                <strong>{day_name[:3].upper()}</strong><br>
+                <small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
+        # Circular Progress Chart
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
