@@ -8,6 +8,7 @@ from utils import render_sidebar, check_rate_limit
 from services import FocusService, FinanceService
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 # --- 1. CONFIGURATION ---
 JWT_SECRET = "ethos_super_secret_key_123" 
@@ -102,6 +103,10 @@ st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date}")
 
 # --- 5. GRID LAYOUT ---
 r1_c1, r1_c2, r1_c3 = st.columns(3)
+
+class TaskSchema(BaseModel):
+    name: str
+    is_done: bool
 
 with r1_c1: # PROTOCOL CARD
     raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
