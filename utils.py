@@ -1,4 +1,24 @@
 import streamlit as st
+import time
+
+def check_rate_limit(limit=10, window=60):
+    """
+    Limits a user to 'limit' actions every 'window' seconds.
+    Default: 10 actions per minute.
+    """
+    if 'request_history' not in st.session_state:
+        st.session_state.request_history = []
+
+    current_time = time.time()
+    st.session_state.request_history = [
+        t for t in st.session_state.request_history if current_time - t < window
+    ]
+
+    if len(st.session_state.request_history) >= limit:
+        return False 
+    
+    st.session_state.request_history.append(current_time)
+    return True
 
 def render_sidebar():
     user = st.session_state.get('user_email', 'Unknown')
