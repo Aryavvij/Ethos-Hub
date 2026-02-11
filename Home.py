@@ -121,6 +121,7 @@ with r1_c1: # PROTOCOL CARD
     st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 with r1_c2: # TIMETABLE CARD
+    t_time = now.strftime('%H:%M:%S')
     activities = fetch_query("SELECT subject, start_time FROM timetable WHERE user_email=%s AND day_name=%s AND start_time > %s ORDER BY start_time ASC LIMIT 3", (user, now.strftime('%A'), t_time))
     content = "".join([f'<div class="task-item"><span style="color:{ETHOS_GREEN}; margin-right:10px;">{row[1]}</span> {row[0].upper()}</div>' for row in activities])
     st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Next Activities</div>{content or "Day Complete"}</div>', unsafe_allow_html=True)
