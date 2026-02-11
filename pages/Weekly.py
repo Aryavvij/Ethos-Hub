@@ -20,38 +20,51 @@ days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 # --- CSS STYLING (The Alignment Fix) ---
 st.markdown("""
     <style>
-    /* Shrink the checkbox itself to match the text */
-    [data-testid="stCheckbox"] [data-testid="stWidgetLabel"] span {
-        transform: scale(0.85); /* Scale down the box slightly */
-        margin-right: -5px;
+    /* 1. Circular Chart Styling */
+    .progress-wrapper {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0;
     }
-
+    .circular-chart {
+        display: block;
+        margin: 10px auto;
+        max-width: 55px;
+        max-height: 55px;
+    }
+    .circle-bg { fill: none; stroke: #333; stroke-width: 3.8; }
+    .circle { 
+        fill: none; 
+        stroke-width: 2.8; 
+        stroke: #76b372; 
+        stroke-linecap: round; 
+        transition: stroke-dasharray 0.3s ease; 
+    }
+    
+    /* 2. Checkbox Scaling & Alignment */
+    [data-testid="stCheckbox"] [data-testid="stWidgetLabel"] span {
+        transform: scale(0.9);
+        margin-right: -2px;
+    }
     [data-testid="stCheckbox"] {
         display: flex !important;
         align-items: center !important;
-        min-height: 0px !important;
-        padding: 2px 0 !important;
+        padding: 5px 0 !important;
     }
-    
     [data-testid="stCheckbox"] label {
         display: flex !important;
         align-items: center !important;
-        gap: 12px !important;
+        gap: 14px !important;
     }
 
-    /* Boost the text size and align it */
+    /* 3. Bold Task Text */
     .task-text {
-        font-size: 14px !important; /* Larger text */
-        font-weight: 700 !important;
-        line-height: 1 !important;
+        font-size: 15px !important; 
+        font-weight: 800 !important;
+        line-height: 1.2 !important;
         margin: 0 !important;
-        padding-top: 1px !important; /* Fine-tune centering */
+        padding-top: 1px !important;
         color: white;
-    }
-
-    /* Container height control */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 0px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -103,14 +116,12 @@ for i, day_name in enumerate(days):
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
-        # Day Header
         st.markdown(f"""
             <div style="background:#76b372; padding:8px; border-radius:5px; text-align:center; color:white; width:100%; box-sizing:border-box;">
                 <strong style="font-size: 13px;">{day_name[:3].upper()}</strong><br><small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
-        # Circular Progress Chart
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -137,5 +148,5 @@ for i, day_name in enumerate(days):
                         st.rerun()
                 
                 with t_c2:
-                    text_style = "text-decoration: line-through; color: #555;" if tdone else "color: white;"
+                    text_style = "text-decoration: line-through; color: #666;" if tdone else "color: white;"
                     st.markdown(f"<p class='task-text' style='{text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
