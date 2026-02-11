@@ -2,8 +2,10 @@ services:
   - type: web
     name: ethos-hub-docker
     runtime: docker
-    plan: free 
-    repo: https://github.com/Aryavvij/Ethos-Hub/tree/main
+    plan: free
+    repo: https://github.com/Aryavvij/Ethos-Hub
     envVars:
       - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
         sync: false
