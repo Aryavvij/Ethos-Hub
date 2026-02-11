@@ -20,48 +20,38 @@ days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 # --- CSS STYLING (The Alignment Fix) ---
 st.markdown("""
     <style>
-    /* 1. Force checkbox and text to share a horizontal centerline */
+    /* Shrink the checkbox itself to match the text */
+    [data-testid="stCheckbox"] [data-testid="stWidgetLabel"] span {
+        transform: scale(0.85); /* Scale down the box slightly */
+        margin-right: -5px;
+    }
+
     [data-testid="stCheckbox"] {
         display: flex !important;
         align-items: center !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        min-height: 0px !important;
+        padding: 2px 0 !important;
     }
     
-    [data-testid="stCheckbox"] > label {
+    [data-testid="stCheckbox"] label {
         display: flex !important;
         align-items: center !important;
-        margin-bottom: 0px !important;
+        gap: 12px !important;
     }
 
-    /* 2. Slim down the container padding for the 7-day grid */
-    [data-testid="stVerticalBlock"] > div {
-        padding-top: 2px !important;
-        padding-bottom: 2px !important;
-    }
-
-    /* 3. Circular Progress Chart Styling */
-    .progress-wrapper {
-        display: flex;
-        justify-content: center;
-        padding: 10px 0;
-    }
-    .circular-chart {
-        display: block;
-        margin: 10px auto;
-        max-width: 55px;
-        max-height: 55px;
-    }
-    .circle-bg { fill: none; stroke: #333; stroke-width: 3.8; }
-    .circle { fill: none; stroke-width: 2.8; stroke: #76b372; stroke-linecap: round; transition: stroke-dasharray 0.3s ease; }
-    
-    /* 4. Task Row optical centering */
+    /* Boost the text size and align it */
     .task-text {
-        margin: 0 !important; 
-        font-size: 11px !important; 
-        font-weight: bold !important; 
-        line-height: 1.2 !important;
-        padding-top: 3px; /* Micro-adjustment to center text with checkbox */
+        font-size: 14px !important; /* Larger text */
+        font-weight: 700 !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+        padding-top: 1px !important; /* Fine-tune centering */
+        color: white;
+    }
+
+    /* Container height control */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0px !important;
     }
     </style>
 """, unsafe_allow_html=True)
