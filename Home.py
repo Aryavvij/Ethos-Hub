@@ -46,10 +46,9 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    cookies = controller.get_all()
-    
-    if cookies is not None:
+    try:
         token = controller.get(cookie_name)
+        
         if token:
             email, refresh_needed = verify_jwt(token)
             if email:
@@ -59,6 +58,8 @@ if not st.session_state.logged_in:
                 if refresh_needed:
                     controller.set(cookie_name, create_jwt(email))
                     st.rerun()
+    except Exception:
+        pass
 
 if not st.session_state.logged_in:
     st.markdown(f"""
