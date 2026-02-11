@@ -4,17 +4,12 @@ import jwt
 import datetime
 from datetime import datetime as dt, timedelta
 from database import fetch_query, execute_query
-from utils import render_sidebar
+from utils import render_sidebar, check_rate_limit 
 from services import FocusService, FinanceService
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
 
-# --- 1. DATA SCHEMAS ---
-class TaskSchema(BaseModel):
-    name: str
-    is_done: bool = False
-
-# --- 2. CONFIGURATION ---
+# --- 1. CONFIGURATION ---
 JWT_SECRET = "ethos_super_secret_key_123" 
 JWT_ALGO = "HS256"
 ETHOS_GREEN = "#76b372"
@@ -23,12 +18,9 @@ st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
 cookie_name = "ethos_user_token"
 
-# --- 3. UPDATED AUTH UTILITIES (Sliding Window) ---
+# --- 2. AUTH UTILITIES ---
 def create_jwt(email):
-    payload = {
-        "email": email, 
-        "exp": dt.utcnow() + timedelta(days=30) 
-    }
+    payload = {"email": email, "exp": dt.utcnow() + timedelta(days=30)}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 def verify_jwt(token):
@@ -38,68 +30,50 @@ def verify_jwt(token):
         exp_ts = payload.get('exp')
         needs_refresh = (exp_ts - dt.utcnow().timestamp()) < (5 * 86400)
         return email, needs_refresh
-    except:
-        return None, False
+    except: return None, False
 
-# --- 4. AUTHENTICATION FLOW ---
+# --- 3. AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
     try:
         token = controller.get(cookie_name)
-        
         if token:
             email, refresh_needed = verify_jwt(token)
             if email:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
-                
                 if refresh_needed:
                     controller.set(cookie_name, create_jwt(email))
                     st.rerun()
-    except Exception:
-        pass
+    except Exception: pass
 
 if not st.session_state.logged_in:
-    st.markdown(f"""
-        <style>
-        div.stButton > button[kind="primary"] {{
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(118, 179, 114, 0.2) !important;
-            color: white !important;
-            border-radius: 8px !important;
-            font-weight: 400 !important;
-            height: 3rem !important;
-            transition: all 0.3s ease !important;
-        }}
-        div.stButton > button[kind="primary"]:hover {{
-            border-color: {ETHOS_GREEN} !important;
-            background-color: rgba(118, 179, 114, 0.05) !important;
-        }}
-        </style>
-    """, unsafe_allow_html=True)
-
+    st.markdown(f"""<style>div.stButton > button[kind="primary"] {{ background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(118, 179, 114, 0.2) !important; color: white !important; border-radius: 8px !important; transition: all 0.3s ease !important; height: 3rem !important; }}</style>""", unsafe_allow_html=True)
     st.title("ETHOS SYSTEM ACCESS")
     t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
     with t1:
         e_in = st.text_input("Email", key="l_e")
         p_in = st.text_input("Password", type='password', key="l_p")
         if st.button("INITIATE SESSION", use_container_width=True, type="primary"):
-            res = fetch_query("SELECT password FROM users WHERE email=%s", (e_in,))
-            if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                st.session_state.logged_in = True
-                st.session_state.user_email = e_in
-                controller.set(cookie_name, create_jwt(e_in))
-                st.rerun()
+            if not check_rate_limit(limit=5, window=60):
+                st.error("Too many attempts. System cooling down for 60s.")
+            else:
+                res = fetch_query("SELECT password FROM users WHERE email=%s", (e_in,))
+                if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = e_in
+                    controller.set(cookie_name, create_jwt(e_in))
+                    st.rerun()
+                else: st.error("Access Denied.")
     st.stop()
 
-# --- 5. INITIALIZATION & STYLING ---
+# --- 4. DASHBOARD RENDERING ---
 user = st.session_state.user_email
 render_sidebar()
 now = dt.now()
 t_date = now.date()
-t_time = now.strftime("%H:%M")
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
@@ -126,7 +100,7 @@ st.markdown(f"""
 st.title("ETHOS COMMAND")
 st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date}")
 
-# --- 6. GRID LAYOUT ---
+# --- 5. GRID LAYOUT ---
 r1_c1, r1_c2, r1_c3 = st.columns(3)
 
 with r1_c1: # PROTOCOL CARD
