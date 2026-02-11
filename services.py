@@ -64,7 +64,6 @@ class FinanceService:
             remaining_budget=res[0][0] if res and res[0][0] is not None else 0.0,
             net_debt=debt_res[0][0] if debt_res and debt_res[0][0] is not None else 0.0
         )
-        )
 
 # --- 4. CACHE INVALIDATOR ---
 def invalidate_user_caches():
