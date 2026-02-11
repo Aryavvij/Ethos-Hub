@@ -44,12 +44,26 @@ class FinanceService:
     @staticmethod
     @st.cache_data(ttl=300)
     def get_dashboard_metrics(user_email: str, period: str) -> FinanceSummary:
-        budget_res = fetch_query("SELECT SUM(plan - actual) FROM finances WHERE user_email=%s AND period=%s", (user_email, period))
+        query = """
+            SELECT 
+                (SELECT COALESCE(SUM(plan), 0) FROM finances WHERE user_email=%s AND period=%s) - 
+                (SELECT COALESCE(SUM(amount), 0) FROM expense_logs 
+                 WHERE user_email=%s AND EXTRACT(MONTH FROM expense_date) = %s 
+                 AND EXTRACT(YEAR FROM expense_date) = %s)
+        """
+        import calendar
+        p_parts = period.split()
+        m_num = list(calendar.month_name).index(p_parts[0])
+        y_num = int(p_parts[1])
+        
+        res = fetch_query(query, (user_email, period, user_email, m_num, y_num))
+        
         debt_res = fetch_query("SELECT SUM(amount - paid_out) FROM debt WHERE user_email=%s", (user_email,))
         
         return FinanceSummary(
-            remaining_budget=budget_res[0][0] if budget_res and budget_res[0][0] else 0.0,
-            net_debt=debt_res[0][0] if debt_res and debt_res[0][0] else 0.0
+            remaining_budget=res[0][0] if res and res[0][0] is not None else 0.0,
+            net_debt=debt_res[0][0] if debt_res and debt_res[0][0] is not None else 0.0
+        )
         )
 
 # --- 4. CACHE INVALIDATOR ---
