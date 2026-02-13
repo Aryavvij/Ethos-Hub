@@ -93,16 +93,29 @@ st.markdown(f"""
         border-radius: 12px;
         padding: 22px;
         margin-bottom: 20px;
-        height: auto !important; 
-        min-height: 180px; /* Keeps a baseline size for empty cards */
-        
+        height: 280px; /* SHRUNK HEIGHT TO MINIMIZE EMPTY SPACE */
         transition: 0.3s ease;
+        overflow-y: hidden;
     }}
-    /* Remove extra bottom margin from the last item inside the card */
-    .ethos-card > div:last-child {{
-        margin-bottom: 0px !important;
-        padding-bottom: 0px !important;
+    .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
+    .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
+    
+    .task-item {{ 
+        display: flex; 
+        align-items: center; 
+        margin-bottom: 8px; 
+        font-size: 14px; 
+        padding-top: 0px !important;
     }}
+    
+    [data-testid="stVerticalBlock"] > div {{
+        padding-top: 0px !important;
+        gap: 0rem !important;
+    }}
+
+    .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
+    .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
+    .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
     </style>
 """, unsafe_allow_html=True)
 
