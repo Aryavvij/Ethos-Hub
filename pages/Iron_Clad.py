@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
 from database import execute_query, fetch_query
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils import render_sidebar
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(layout="wide", page_title="Iron Clad", page_icon="🏋️")
 
+# --- GATEKEEPER ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("Home.py") 
     st.stop()
@@ -17,8 +17,12 @@ render_sidebar()
 
 # --- INITIALIZATION ---
 user = st.session_state.user_email
-st.title("Iron Clad")
-st.caption("Performance Analytics & Progressive Overload Tracking")
+today = datetime.now().date()
+current_week = today - timedelta(days=today.weekday())
+muscle_groups = ["CHEST", "BACK", "LEGS", "SHOULDERS", "ARMS", "ABS"]
+
+st.title("IRONCLAD")
+st.caption(f"Weekly Performance Analytics | Cycle: {current_week.strftime('%d %b')}")
 
 # --- CUSTOM CSS ---
 st.markdown("""
@@ -27,147 +31,140 @@ st.markdown("""
         background-color: #76b372 !important;
         border-color: #76b372 !important;
         color: white !important;
+        height: 3em;
+        font-weight: bold;
+        border-radius: 8px;
     }
-    div.stButton > button[kind="primary"]:hover {
-        background-color: #5e8f5b !important;
-        border-color: #5e8f5b !important;
+    [data-testid="stPlotlyChart"] {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+        border: 1px solid rgba(118, 179, 114, 0.1);
+        padding: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- GLOBAL OVERVIEW: STRENGTH POTENTIAL EVOLUTION (STACKED AREA) ---
-global_strength_evo = fetch_query("""
-    WITH exercise_strength AS (
-        SELECT 
-            DATE_TRUNC('month', l.workout_date) as period, 
-            ex.muscle_group, 
-            l.exercise_name,
-            MAX(l.weight * (1 + l.reps / 30.0)) as max_e1rm
-        FROM workout_logs l
-        JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
-        WHERE l.user_email=%s AND l.reps > 0
-        GROUP BY 1, 2, 3
-    )
-    SELECT period, muscle_group, SUM(max_e1rm) as total_muscle_strength
-    FROM exercise_strength
-    GROUP BY 1, 2 
-    ORDER BY 1 ASC
+# --- 1. THE GLOBAL STACKED EVOLUTION ---
+st.subheader("Total Strength Evolution")
+
+raw_progress = fetch_query("""
+    SELECT week_start, muscle_group, volume_sq 
+    FROM muscle_progress 
+    WHERE user_email=%s 
+    ORDER BY week_start ASC
 """, (user,))
 
-if global_strength_evo:
-    df_strength = pd.DataFrame(global_strength_evo, columns=["Period", "Muscle Group", "Strength Score"])
+if raw_progress:
+    df_p = pd.DataFrame(raw_progress, columns=["Week", "Muscle Group", "Strength Score"])
     
-    fig_strength = px.area(
-        df_strength, 
-        x="Period", 
+    fig_area = px.area(
+        df_p, 
+        x="Week", 
         y="Strength Score", 
         color="Muscle Group",
-        title="<b>Total Strength Potential (Monthly 1RM Evolution)</b>",
-        template="plotly_dark",
+        template="plotly_dark", 
         color_discrete_sequence=px.colors.qualitative.Pastel,
-        height=450
+        height=400
     )
-
-    fig_strength.update_layout(
+    fig_area.update_layout(
+        margin=dict(l=10, r=10, t=20, b=10),
         xaxis_title=None,
-        yaxis_title="Combined Estimated 1RM (kg)",
-        hovermode="x unified",
-        margin=dict(l=10, r=10, t=40, b=10)
+        yaxis_title="Combined Strength Score",
+        hovermode="x unified"
     )
-    
-    st.plotly_chart(fig_strength, use_container_width=True)
+    st.plotly_chart(fig_area, use_container_width=True)
 else:
-    st.info("Log your sessions to visualize your long-term strength evolution.")
+    st.info("Log your first session below to begin visualizing your strength evolution.")
 
 st.markdown("---")
 
-# --- TARGETED MUSCLE GROUP TABLES ---
-muscle_groups = ["Chest", "Back", "Legs", "Shoulders", "Biceps", "Triceps", "Forearms", "Abs"]
+# --- 2. LOGGING SYSTEM ---
+st.subheader("Weekly Performance Log")
+st.caption("Enter your best set details. If logged twice a week, the average performance is tracked.")
 
-all_ex_data = fetch_query("SELECT exercise_name, muscle_group, last_weight, last_reps FROM exercise_library WHERE user_email=%s", (user,))
-all_ex_df = pd.DataFrame(all_ex_data, columns=["Exercise", "Group", "Prev Kg", "Prev Reps"])
+with st.container(border=True):
+    c1, c2, c3 = st.columns(3)
+    selected_muscle = c1.selectbox("Muscle Group", muscle_groups)
+    weight = c2.number_input("Weight (kg)", min_value=0.0, step=2.5)
+    reps = c3.number_input("Reps", min_value=0, step=1)
 
-updated_sessions = []
-
-for group in muscle_groups:
-    with st.expander(f"➔ {group.upper()} PROGRESS", expanded=False):
-        
-        # --- MULTI-LINE EXERCISE PROGRESS CHART (EPLEY 1RM) ---
-        ex_history = fetch_query("""
-            SELECT 
-                l.workout_date, 
-                l.exercise_name, 
-                MAX(l.weight * (1 + l.reps / 30.0)) as estimated_1rm
-            FROM workout_logs l
-            JOIN exercise_library ex ON l.exercise_name = ex.exercise_name
-            WHERE l.user_email=%s AND ex.muscle_group=%s AND l.reps > 0
-            GROUP BY 1, 2 ORDER BY 1 ASC
-        """, (user, group))
-
-        if ex_history:
-            h_df = pd.DataFrame(ex_history, columns=["Date", "Exercise", "Strength Index"])
-            fig_h = px.line(
-                h_df, x="Date", y="Strength Index", color="Exercise",
-                title=f"{group} Strength Index (Max 1RM Trend)",
-                template="plotly_dark", height=250
-            )
-            fig_h.update_layout(
-                margin=dict(l=0, r=0, t=30, b=0), 
-                xaxis_title=None, 
-                yaxis_title="Est. Max (kg)",
-                showlegend=True
-            )
-            fig_h.update_traces(line_width=2, mode='lines+markers', line_shape='spline')
-            st.plotly_chart(fig_h, use_container_width=True)
-
-        # --- DATA EDITOR TABLE ---
-        group_df = all_ex_df[all_ex_df["Group"] == group].copy()
-        
-        if group_df.empty:
-            st.caption(f"No {group} exercises found. Add your routine below.")
-            group_df = pd.DataFrame([{"Exercise": "", "Sets": 0, "Weight": 0.0, "Reps": 0, "Prev Kg": 0.0, "Prev Reps": 0}])
+    if st.button("COMMIT PERFORMANCE DATA", use_container_width=True, type="primary"):
+        if weight > 0 and reps > 0:
+            current_score = weight * (1 + reps / 30.0)
+            
+            existing = fetch_query("""
+                SELECT id, volume_sq, frequency 
+                FROM muscle_progress 
+                WHERE user_email=%s AND muscle_group=%s AND week_start=%s
+            """, (user, selected_muscle, current_week))
+            
+            if existing:
+                row_id, old_score, freq = existing[0]
+                avg_score = (old_score + current_score) / 2
+                execute_query("""
+                    UPDATE muscle_progress SET volume_sq=%s, frequency=%s WHERE id=%s
+                """, (avg_score, freq + 1, row_id))
+                st.success(f"Session {freq+1} archived. Weekly average adjusted.")
+            else:
+                execute_query("""
+                    INSERT INTO muscle_progress (user_email, muscle_group, week_start, volume_sq, frequency)
+                    VALUES (%s, %s, %s, %s, 1)
+                """, (user, selected_muscle, current_week, current_score))
+                st.success(f"First {selected_muscle} session of the week archived.")
+            
+            st.rerun()
         else:
-            group_df = group_df.reset_index(drop=True)
-            group_df["Sets"] = 0
-            group_df["Weight"] = 0.0
-            group_df["Reps"] = 0
-            group_df = group_df[["Exercise", "Sets", "Weight", "Reps", "Prev Kg", "Prev Reps"]]
+            st.warning("Please enter weight and reps to archive data.")
 
-        edited = st.data_editor(
-            group_df,
-            use_container_width=True,
-            num_rows="dynamic",
-            hide_index=True,
-            key=f"editor_{group}",
-            column_config={
-                "Prev Kg": st.column_config.NumberColumn("Prev Kg", disabled=True, format="%.1f"),
-                "Prev Reps": st.column_config.NumberColumn("Prev Reps", disabled=True),
-                "Weight": st.column_config.NumberColumn("Today's Kg", format="%.1f", min_value=0.0),
-                "Sets": st.column_config.NumberColumn("Sets", min_value=0),
-                "Reps": st.column_config.NumberColumn("Reps", min_value=0)
-            }
-        )
-        updated_sessions.append((group, edited))
+st.markdown("---")
 
-# --- DATA SYNCHRONIZATION ---
-if st.button("COMMIT ENTIRE SESSION", use_container_width=True, type="primary"):
-    total_logged = 0
-    for group, df in updated_sessions:
-        for _, row in df.iterrows():
-            if row["Exercise"] and (row["Weight"] > 0 or row["Reps"] > 0):
-                execute_query("""
-                    INSERT INTO workout_logs (user_email, exercise_name, weight, reps, sets, workout_date) 
-                    VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)
-                """, (user, row["Exercise"], row["Weight"], row["Reps"], row["Sets"]))
-                
-                execute_query("""
-                    INSERT INTO exercise_library (user_email, exercise_name, muscle_group, last_weight, last_reps)
-                    VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (user_email, exercise_name) 
-                    DO UPDATE SET last_weight=EXCLUDED.last_weight, last_reps=EXCLUDED.last_reps, muscle_group=EXCLUDED.muscle_group
-                """, (user, row["Exercise"], group, row["Weight"], row["Reps"]))
-                total_logged += 1
+# --- 3. INDIVIDUAL MUSCLE TRENDS ---
+st.subheader("Individual Muscle Trends")
+
+if raw_progress:
+    df_p = pd.DataFrame(raw_progress, columns=["Week", "Muscle Group", "Strength Score"])
     
-    if total_logged > 0:
-        st.success(f"Archived {total_logged} exercises. Performance data updated.")
-        st.rerun()
+    for muscle in muscle_groups:
+        muscle_df = df_p[df_p["Muscle Group"] == muscle]
+        
+        if not muscle_df.empty:
+            with st.expander(f"📈 {muscle} PROGRESSION DETAILS"):
+                fig_line = px.line(
+                    muscle_df, 
+                    x="Week", 
+                    y="Strength Score",
+                    title=f"{muscle} Strength Trend",
+                    template="plotly_dark", 
+                    markers=True
+                )
+                fig_line.update_traces(line_color="#76b372", line_width=3, marker=dict(size=8))
+                fig_line.update_layout(
+                    height=300, 
+                    margin=dict(l=10, r=10, t=40, b=10),
+                    yaxis_title="Strength Score",
+                    xaxis_title=None
+                )
+                st.plotly_chart(fig_line, use_container_width=True)
+                
+                if len(muscle_df) > 1:
+                    current_val = muscle_df.iloc[-1]["Strength Score"]
+                    prev_val = muscle_df.iloc[-2]["Strength Score"]
+                    delta = current_val - prev_val
+                    st.metric(
+                        label=f"Current {muscle} Score", 
+                        value=f"{current_val:.1f}", 
+                        delta=f"{delta:+.1f}"
+                    )
+else:
+    st.caption("Individual charts will appear once sessions are logged.")
+
+# --- 4. DATA FEED ---
+with st.expander("VIEW RAW PERFORMANCE HISTORY"):
+    if raw_progress:
+        st.dataframe(
+            pd.DataFrame(raw_progress, columns=["Week", "Muscle", "Score"]).sort_values("Week", ascending=False),
+            use_container_width=True, 
+            hide_index=True
+        )
+    else:
+        st.write("No performance logs found.")
