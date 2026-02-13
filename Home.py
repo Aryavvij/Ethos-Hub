@@ -85,36 +85,38 @@ t_date = now.date()
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
+# Replace the CSS block in your Home.py
 st.markdown(f"""
     <style>
     .ethos-card {{
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(118, 179, 114, 0.15);
         border-radius: 12px;
-        padding: 20px; 
+        padding: 22px;
         margin-bottom: 20px;
-        height: 255px !important; 
-        
+        height: 280px;
         transition: 0.3s ease;
-        overflow: hidden; 
+        overflow-y: hidden;
     }}
-    
     .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
+    .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
     
-    .card-label {{ 
-        color: {ETHOS_GREEN}; 
-        font-size: 11px; 
-        font-weight: 700; 
-        text-transform: uppercase; 
-        letter-spacing: 1.5px; 
-        margin-bottom: 12px; 
-    }}
     .task-item {{ 
         display: flex; 
         align-items: center; 
-        margin-bottom: 6px !important; 
+        margin-bottom: 8px; 
         font-size: 14px; 
+        padding-top: 0px !important;
     }}
+    
+    [data-testid="stVerticalBlock"] > div {{
+        padding-top: 0px !important;
+        gap: 0rem !important;
+    }}
+
+    .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
+    .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
+    .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
     </style>
 """, unsafe_allow_html=True)
 
