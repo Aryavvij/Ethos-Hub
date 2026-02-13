@@ -38,7 +38,6 @@ def render_sidebar():
                 </span>
             </div>
         """, unsafe_allow_html=True)
-        st.write("---")
         
         # SECURE LOGOUT BUTTON
         if st.button("LOGOUT", use_container_width=True):
