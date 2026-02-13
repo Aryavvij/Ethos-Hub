@@ -24,52 +24,32 @@ st.markdown("""
         background: #76b372; padding: 12px; border-radius: 8px; 
         text-align: center; color: white; margin-bottom: 10px; width: 100%;
     }
+    .day-header strong { font-size: 18px !important; display: block; }
+    
     .progress-wrapper {
         display: flex; justify-content: center; align-items: center;
-        width: 100%; padding: 10px 0 15px 0;
+        width: 100%; padding: 10px 0 20px 0;
     }
     .circular-chart { width: 85% !important; max-width: 100px; height: auto; }
-
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 0px !important; /* Kills the main container padding */
-        margin-bottom: 8px !important;
-    }
-
-    [data-testid="stVerticalBlock"] > div {
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-        gap: 0rem !important; /* Removes gap between internal elements */
-    }
-    [data-testid="column"] {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important; 
-        align-items: flex-start !important;
-        padding: 4px 0px !important; /* Minimum padding for visual breathing room */
-    }
+    .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
+    .circle { fill: none; stroke-width: 3.5; stroke: #76b372; stroke-linecap: round; }
+    
+    /* VERTICAL CENTERING & TIGHT BOXES */
+    [data-testid="stVerticalBlock"] > div { padding-top: 0px !important; padding-bottom: 0px !important; }
+    div[data-testid="stVerticalBlockBorderWrapper"] { padding: 0px !important; margin-bottom: 5px !important; }
 
     .task-text {
-        font-size: 14px !important; 
-        font-weight: 600 !important; 
-        line-height: 1.1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: white;
-        display: flex;
-        align-items: center;
-        min-height: 24px; /* Matches the checkbox height */
+        font-size: 13px !important; font-weight: 600 !important; 
+        line-height: 1.1 !important; margin: 0 !important;
+        display: flex !important; align-items: center !important; 
+        min-height: 32px; width: 100%;
     }
-    div[data-testid="stCheckbox"] {
-        margin: 0px !important;
+
+    /* Action Buttons Styling - Minimalist emoji buttons */
+    div[data-testid="column"] button {
         padding: 0px !important;
-        min-height: 24px;
-        display: flex;
-        align-items: center;
-    }
-    
-    div[data-testid="stCheckbox"] label {
-        margin-bottom: 0px !important;
-        padding: 0px !important;
+        border: none !important;
+        background: transparent !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -133,6 +113,7 @@ for i, day_name in enumerate(days):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
 
+            # Inline Editor
             if st.session_state.get(f"editing_{tid}", False):
                 with st.container(border=True):
                     new_name = st.text_input("Rename Task", value=tname, key=f"input_{tid}")
