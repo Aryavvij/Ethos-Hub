@@ -8,7 +8,6 @@ from utils import render_sidebar, check_rate_limit
 from services import FocusService, FinanceService
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
-from pydantic import BaseModel
 
 # --- 1. CONFIGURATION ---
 JWT_SECRET = "ethos_super_secret_key_123" 
@@ -31,32 +30,35 @@ def verify_jwt(token):
         exp_ts = payload.get('exp')
         needs_refresh = (exp_ts - dt.utcnow().timestamp()) < (5 * 86400)
         return email, needs_refresh
-    except: return None, False
+    except: 
+        return None, False
 
-# --- 3. AUTHENTICATION FLOW ---
+# --- 3. PERSISTENT AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    try:
-        token = controller.get(cookie_name)
-        if token:
-            email, refresh_needed = verify_jwt(token)
-            if email:
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                if refresh_needed:
-                    controller.set(cookie_name, create_jwt(email))
-                    st.rerun()
-    except Exception: pass
+    token = controller.get(cookie_name)
+    if token:
+        email, refresh_needed = verify_jwt(token)
+        if email:
+            st.session_state.logged_in = True
+            st.session_state.user_email = email
+            if refresh_needed:
+                controller.set(cookie_name, create_jwt(email))
+            st.rerun()
 
+# --- LOGIN SCREEN ---
 if not st.session_state.logged_in:
     st.markdown(f"""<style>div.stButton > button[kind="primary"] {{ background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(118, 179, 114, 0.2) !important; color: white !important; border-radius: 8px !important; transition: all 0.3s ease !important; height: 3rem !important; }}</style>""", unsafe_allow_html=True)
+    
     st.title("ETHOS SYSTEM ACCESS")
     t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
+    
     with t1:
-        e_in = st.text_input("Email", key="l_e")
-        p_in = st.text_input("Password", type='password', key="l_p")
+        e_in = st.text_input("Email", key="l_e", autocomplete="username")
+        p_in = st.text_input("Password", type='password', key="l_p", autocomplete="current-password")
+        
         if st.button("INITIATE SESSION", use_container_width=True, type="primary"):
             if not check_rate_limit(limit=5, window=60):
                 st.error("Too many attempts. System cooling down for 60s.")
@@ -67,7 +69,12 @@ if not st.session_state.logged_in:
                     st.session_state.user_email = e_in
                     controller.set(cookie_name, create_jwt(e_in))
                     st.rerun()
-                else: st.error("Access Denied.")
+                else: 
+                    st.error("Wrong Password or Username")
+    
+    with t2:
+        st.info("Registration requires administrator clearance.")
+        
     st.stop()
 
 # --- 4. DASHBOARD RENDERING ---
@@ -136,13 +143,13 @@ with r1_c3: # BLUEPRINT CARD
 
 r2_c1, r2_c2, r2_c3 = st.columns(3)
 
-with r2_c1: # FINANCIAL CARD (Service-Powered)
+with r2_c1: # FINANCIAL CARD
     fin_metrics = FinanceService.get_dashboard_metrics(user, t_date.strftime("%B %Y"))
     st.markdown(f'''<div class="ethos-card"><div class="card-label">Financial: Budget & Debt</div>
                 <div class="metric-val">₹ {fin_metrics.remaining_budget:,.0f}</div><div class="metric-sub">Remaining Budget</div>
                 <div style="margin-top:15px;" class="metric-val" style="color:#ff4b4b;">₹ {fin_metrics.net_debt:,.0f}</div><div class="metric-sub">Net Liability</div></div>''', unsafe_allow_html=True)
 
-with r2_c2: # NEURAL LOCK CARD (Service-Powered)
+with r2_c2: # NEURAL LOCK CARD
     logs = FocusService.get_daily_logs(user, t_date)
     content = "".join([f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;"><span>{row.task_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>' for row in logs])
     st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
