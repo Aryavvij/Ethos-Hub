@@ -18,39 +18,59 @@ start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 # --- CSS STYLING ---
+# --- CSS STYLING: TIGHT-WRAP BOXES ---
 st.markdown("""
     <style>
     .day-header {
         background: #76b372; padding: 12px; border-radius: 8px; 
         text-align: center; color: white; margin-bottom: 10px; width: 100%;
     }
-    .day-header strong { font-size: 18px !important; display: block; }
-    
     .progress-wrapper {
         display: flex; justify-content: center; align-items: center;
-        width: 100%; padding: 10px 0 20px 0;
+        width: 100%; padding: 10px 0 15px 0;
     }
     .circular-chart { width: 85% !important; max-width: 100px; height: auto; }
-    .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
-    .circle { fill: none; stroke-width: 3.5; stroke: #76b372; stroke-linecap: round; }
-    
-    /* VERTICAL CENTERING & TIGHT BOXES */
-    [data-testid="stVerticalBlock"] > div { padding-top: 0px !important; padding-bottom: 0px !important; }
-    div[data-testid="stVerticalBlockBorderWrapper"] { padding: 0px !important; margin-bottom: 5px !important; }
 
-    .task-text {
-        font-size: 13px !important; font-weight: 600 !important; 
-        line-height: 1.1 !important; margin: 0 !important;
-        display: flex !important; align-items: center !important; 
-        min-height: 32px; width: 100%;
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0px !important; /* Kills the main container padding */
+        margin-bottom: 8px !important;
     }
 
-    /* Action Buttons Styling */
-    .stButton > button {
-        padding: 2px 5px !important;
-        font-size: 12px !important;
-        background-color: transparent !important;
-        border: none !important;
+    [data-testid="stVerticalBlock"] > div {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        gap: 0rem !important; /* Removes gap between internal elements */
+    }
+    [data-testid="column"] {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important; 
+        align-items: flex-start !important;
+        padding: 4px 0px !important; /* Minimum padding for visual breathing room */
+    }
+
+    .task-text {
+        font-size: 14px !important; 
+        font-weight: 600 !important; 
+        line-height: 1.1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: white;
+        display: flex;
+        align-items: center;
+        min-height: 24px; /* Matches the checkbox height */
+    }
+    div[data-testid="stCheckbox"] {
+        margin: 0px !important;
+        padding: 0px !important;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+    }
+    
+    div[data-testid="stCheckbox"] label {
+        margin-bottom: 0px !important;
+        padding: 0px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -90,7 +110,8 @@ for i, day_name in enumerate(days):
         
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
-                t_c1, t_c2, t_c3 = st.columns([0.15, 0.65, 0.2], vertical_alignment="center")
+                # Columns: Checkbox | Text | Edit | Delete
+                t_c1, t_c2, t_c3, t_c4 = st.columns([0.15, 0.55, 0.15, 0.15], vertical_alignment="center")
                 
                 with t_c1:
                     new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
@@ -104,24 +125,23 @@ for i, day_name in enumerate(days):
                     st.markdown(f'<div class="task-text" style="text-decoration: {text_decoration}; color: {text_color};">{tname.upper()}</div>', unsafe_allow_html=True)
                 
                 with t_c3:
-                    edit_trigger = st.button(key=f"ed_{tid}")
-                    del_trigger = st.button(key=f"del_{tid}")
-                    
-                    if del_trigger:
+                    if st.button(key=f"ed_{tid}"):
+                        st.session_state[f"editing_{tid}"] = True
+                        st.rerun()
+                
+                with t_c4:
+                    if st.button(key=f"del_{tid}"):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
-                    
-                    if edit_trigger:
-                        st.session_state[f"editing_{tid}"] = True
 
             if st.session_state.get(f"editing_{tid}", False):
                 with st.container(border=True):
-                    new_name = st.text_input("Edit Task", value=tname, key=f"input_{tid}")
-                    col_save, col_cancel = st.columns(2)
-                    if col_save.button("SAVE", key=f"save_{tid}", use_container_width=True):
+                    new_name = st.text_input("Rename Task", value=tname, key=f"input_{tid}")
+                    es1, es2 = st.columns(2)
+                    if es1.button("SAVE", key=f"sv_{tid}", use_container_width=True):
                         execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (new_name, tid))
                         st.session_state[f"editing_{tid}"] = False
                         st.rerun()
-                    if col_cancel.button("CANCEL", key=f"can_{tid}", use_container_width=True):
+                    if es2.button("CANCEL", key=f"cn_{tid}", use_container_width=True):
                         st.session_state[f"editing_{tid}"] = False
                         st.rerun()
