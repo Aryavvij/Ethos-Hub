@@ -17,39 +17,64 @@ user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- CSS STYLING ---
+# --- CSS STYLING: TIGHT-WRAP BOXES ---
 st.markdown("""
     <style>
     .day-header {
         background: #76b372; padding: 12px; border-radius: 8px; 
         text-align: center; color: white; margin-bottom: 10px; width: 100%;
     }
-    .day-header strong { font-size: 18px !important; display: block; }
-    
     .progress-wrapper {
         display: flex; justify-content: center; align-items: center;
-        width: 100%; padding: 10px 0 20px 0;
+        width: 100%; padding: 10px 0 15px 0;
     }
     .circular-chart { width: 85% !important; max-width: 100px; height: auto; }
-    .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
-    .circle { fill: none; stroke-width: 3.5; stroke: #76b372; stroke-linecap: round; }
-    
-    /* VERTICAL CENTERING & TIGHT BOXES */
-    [data-testid="stVerticalBlock"] > div { padding-top: 0px !important; padding-bottom: 0px !important; }
-    div[data-testid="stVerticalBlockBorderWrapper"] { padding: 0px !important; margin-bottom: 5px !important; }
 
-    .task-text {
-        font-size: 13px !important; font-weight: 600 !important; 
-        line-height: 1.1 !important; margin: 0 !important;
-        display: flex !important; align-items: center !important; 
-        min-height: 32px; width: 100%;
+    /* THE SHRINK-WRAP FIX */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0px !important;
+        margin-bottom: 8px !important;
+    }
+    [data-testid="stVerticalBlock"] > div {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        gap: 0rem !important;
     }
 
-    /* Action Buttons Styling - Minimalist emoji buttons */
+    /* VERTICAL CENTERING */
+    [data-testid="column"] {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important; 
+        align-items: flex-start !important;
+        padding: 4px 0px !important;
+    }
+
+    .task-text {
+        font-size: 13px !important; 
+        font-weight: 600 !important; 
+        line-height: 1.1 !important;
+        margin: 0 !important;
+        color: white;
+        display: flex;
+        align-items: center;
+        min-height: 24px;
+    }
+
+    div[data-testid="stCheckbox"] {
+        margin: 0px !important;
+        padding: 0px !important;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Action Buttons (Pencil/Trash) styling */
     div[data-testid="column"] button {
         padding: 0px !important;
         border: none !important;
         background: transparent !important;
+        font-size: 14px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -80,7 +105,7 @@ for i, day_name in enumerate(days):
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
-        st.markdown(f'<div class="day-header"><strong>{day_name[:3].upper()}</strong><small>{this_date.strftime("%d %b")}</small></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="day-header"><strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime("%d %b")}</small></div>', unsafe_allow_html=True)
         
         st.markdown(f'''<div class="progress-wrapper"><svg viewBox="0 0 36 36" class="circular-chart">
             <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
@@ -104,24 +129,24 @@ for i, day_name in enumerate(days):
                     st.markdown(f'<div class="task-text" style="text-decoration: {text_decoration}; color: {text_color};">{tname.upper()}</div>', unsafe_allow_html=True)
                 
                 with t_c3:
-                    if st.button(key=f"ed_{tid}"):
+                    if st.button("", key=f"ed_{tid}"):
                         st.session_state[f"editing_{tid}"] = True
                         st.rerun()
                 
                 with t_c4:
-                    if st.button(key=f"del_{tid}"):
+                    if st.button("", key=f"del_{tid}"):
                         execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
                         st.rerun()
 
             # Inline Editor
             if st.session_state.get(f"editing_{tid}", False):
                 with st.container(border=True):
-                    new_name = st.text_input("Rename Task", value=tname, key=f"input_{tid}")
+                    new_name = st.text_input("Rename", value=tname, key=f"input_{tid}")
                     es1, es2 = st.columns(2)
                     if es1.button("SAVE", key=f"sv_{tid}", use_container_width=True):
                         execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (new_name, tid))
                         st.session_state[f"editing_{tid}"] = False
                         st.rerun()
-                    if es2.button("CANCEL", key=f"cn_{tid}", use_container_width=True):
+                    if es2.button("X", key=f"cn_{tid}", use_container_width=True):
                         st.session_state[f"editing_{tid}"] = False
                         st.rerun()
