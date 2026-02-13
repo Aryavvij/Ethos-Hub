@@ -6,3 +6,4 @@ streamlit-cookies-controller
 PyJWT
 pydantic
 pydantic-settings
+extra-streamlit-components
