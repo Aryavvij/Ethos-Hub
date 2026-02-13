@@ -18,6 +18,9 @@ render_sidebar()
 # --- INITIALIZATION ---
 user = st.session_state.user_email
 st.title("Habit Lab")
+if 'habit_version' not in st.session_state:
+    st.session_state.habit_version = 0
+
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -27,9 +30,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-if 'habit_version' not in st.session_state:
-    st.session_state.habit_version = 0
 
 # --- DATE FILTERS ---
 col_m, col_y = st.columns(2)
@@ -42,7 +42,7 @@ with col_y:
 days_in_month = calendar.monthrange(year, month_num)[1]
 day_cols = [str(i) for i in range(1, days_in_month + 1)]
 
-# --- DATA ENGINE ---
+# --- DATA ENGINE (Reflecting Supabase Changes) ---
 data_key = f"data_{month_num}_{year}_{st.session_state.habit_version}"
 
 if data_key not in st.session_state:
@@ -84,7 +84,7 @@ with st.container(border=True):
         height=400, 
         num_rows="dynamic",
         column_config=col_config,
-        key=f"editor_widget" 
+        key=f"editor_widget_{st.session_state.habit_version}"
     )
 
     if st.button("Synchronize Table", use_container_width=True, type="primary"):
@@ -93,7 +93,6 @@ with st.container(border=True):
         if not valid_save_df.empty:
             execute_query("DELETE FROM habits WHERE user_email=%s AND month=%s AND year=%s", (user, month_num, year))
             
-            save_count = 0
             for _, row in valid_save_df.iterrows():
                 h_clean = str(row["Habit Name"]).strip()
                 has_any_tick = False
@@ -108,11 +107,13 @@ with st.container(border=True):
                 if not has_any_tick:
                     execute_query(
                         "INSERT INTO habits (user_email, habit_name, month, year, day, status) VALUES (%s, %s, %s, %s, %s, %s)",
-                        (user, h_clean, month_num, year, 1, False) # Day 1 as placeholder
+                        (user, h_clean, month_num, year, 1, False)
                     )
-                save_count += 1
+            st.session_state.habit_version += 1
+            st.success("Database synchronized. Refreshing view...")
+            st.rerun()
 
-# --- ANALYTICS & MONTHLY PERFORMANCE ---
+# --- ANALYTICS ---
 valid_df = edited_df[edited_df["Habit Name"].fillna("").str.strip() != ""]
 
 if not valid_df.empty:
@@ -129,17 +130,11 @@ if not valid_df.empty:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("Monthly Performance Overview")
     
     habit_stats = []
-    ethos_green = "#76b372" 
-
     today = datetime.now()
-    if year == today.year and month_num == today.month:
-        denominator = today.day
-    else:
-        denominator = days_in_month
+    denominator = today.day if (year == today.year and month_num == today.month) else days_in_month
 
     for i, (_, row) in enumerate(valid_df.iterrows(), start=1):
         name = row["Habit Name"]
@@ -147,10 +142,7 @@ if not valid_df.empty:
             done_count = sum(1 for d in day_cols if row[d] == True)
             pct = (done_count / denominator) * 100
             habit_stats.append({
-                "#": str(i),
-                "Habit": name,
-                "Days Completed": str(done_count),
-                "Consistency": pct
+                "#": str(i), "Habit": name, "Days Completed": str(done_count), "Consistency": pct
             })
 
     if habit_stats:
@@ -158,21 +150,12 @@ if not valid_df.empty:
         for idx, stat in enumerate(habit_stats):
             with cols[idx % 3]:
                 st.markdown(f"""
-                    <div style="border: none; border-radius: 10px; padding: 20px; 
-                                background: rgba(255,255,255,0.05); margin-bottom: 15px;">
+                    <div style="border: none; border-radius: 10px; padding: 20px; background: rgba(255,255,255,0.05); margin-bottom: 15px;">
                         <p style="margin:0; font-size:11px; color:gray; text-transform:uppercase; letter-spacing:1px;">Habit #{stat["#"]}</p>
                         <h3 style="margin:5px 0 15px 0; color:white; font-size:18px;">{stat["Habit"]}</h3>
                         <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                            <div>
-                                <p style="margin:0; font-size:10px; color:gray;">DAYS DONE</p>
-                                <p style="margin:0; font-weight:bold; font-size:20px;">{stat["Days Completed"]}</p>
-                            </div>
-                            <div style="text-align:right;">
-                                <p style="margin:0; font-size:10px; color:gray;">CONSISTENCY</p>
-                                <p style="margin:0; font-weight:bold; font-size:22px; color:{ethos_green};">{stat["Consistency"]:.1f}%</p>
-                            </div>
+                            <div><p style="margin:0; font-size:10px; color:gray;">DAYS DONE</p><p style="margin:0; font-weight:bold; font-size:20px;">{stat["Days Completed"]}</p></div>
+                            <div style="text-align:right;"><p style="margin:0; font-size:10px; color:gray;">CONSISTENCY</p><p style="margin:0; font-weight:bold; font-size:22px; color:#76b372;">{stat["Consistency"]:.1f}%</p></div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-    else:
-        st.info("Log and Synchronize habits to view the Performance Matrix.")
