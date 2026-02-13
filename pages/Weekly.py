@@ -28,12 +28,12 @@ st.markdown("""
         text-align: center; 
         color: white; 
         margin-bottom: 10px;
-        width: 100%; /* Ensures header defines the column width */
+        width: 100%;
     }
     .day-header strong { font-size: 18px !important; display: block; }
     .day-header small { font-size: 14px !important; opacity: 0.9; }
 
-    /* 2. PROGRESS CHART: Matches Header Width & Aligned */
+    /* 2. PROGRESS CHART */
     .progress-wrapper {
         display: flex;
         justify-content: center;
@@ -42,20 +42,26 @@ st.markdown("""
         padding: 10px 0 20px 0;
     }
     .circular-chart {
-        width: 85% !important; /* Scaled to visually match the header box width */
+        width: 85% !important; 
         max-width: 100px;
         height: auto;
     }
     .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
     .circle { fill: none; stroke-width: 3.5; stroke: #76b372; stroke-linecap: round; }
     
-    /* 3. TASK BOX: The Multi-Line Centering Fix */
-    /* This targets the Streamlit container and forces it to be a centered flex row */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 0px !important;
+    /* 3. TASK BOX: REMOVE TOP/BOTTOM GAP */
+    /* Target the container content block to remove default padding/gaps */
+    [data-testid="stVerticalBlock"] > div {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
     }
     
-    /* Force the internal row of the task to center everything vertically */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0px !important;
+        margin-bottom: 5px !important;
+    }
+
+    /* 4. Column Alignment */
     [data-testid="column"] {
         display: flex !important;
         flex-direction: column !important;
@@ -64,22 +70,27 @@ st.markdown("""
     }
 
     .task-text {
-        font-size: 15px !important; 
+        font-size: 14px !important; 
         font-weight: 600 !important; 
-        line-height: 1.2 !important;
+        line-height: 1.1 !important;
         margin: 0 !important;
         color: white;
         text-align: left;
         width: 100%;
     }
 
-    /* 4. Checkbox Centering */
+    /* 5. Checkbox Centering & Height Fix */
     div[data-testid="stCheckbox"] {
-        margin-bottom: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        height: 100% !important;
+    }
+    
+    /* Remove the label padding that Streamlit adds by default */
+    div[data-testid="stCheckbox"] label {
+        margin-bottom: 0px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -122,7 +133,6 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # Circular Progress (Width Aligned)
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -136,7 +146,6 @@ for i, day_name in enumerate(days):
         # Tasks
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
-
                 t_c1, t_c2 = st.columns([0.2, 0.8], vertical_alignment="center")
                 
                 with t_c1:
