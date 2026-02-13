@@ -49,8 +49,7 @@ st.markdown("""
     .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
     .circle { fill: none; stroke-width: 3.5; stroke: #76b372; stroke-linecap: round; }
     
-    /* 3. TASK BOX: REMOVE TOP/BOTTOM GAP */
-    /* Target the container content block to remove default padding/gaps */
+    /* 3. TASK BOX FIXES */
     [data-testid="stVerticalBlock"] > div {
         padding-top: 0px !important;
         padding-bottom: 0px !important;
@@ -61,14 +60,7 @@ st.markdown("""
         margin-bottom: 5px !important;
     }
 
-    /* 4. Column Alignment */
-    [data-testid="column"] {
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important; 
-        align-items: center !important;
-    }
-
+    /* THE VERTICAL CENTERING FIX */
     .task-text {
         font-size: 14px !important; 
         font-weight: 600 !important; 
@@ -77,18 +69,21 @@ st.markdown("""
         color: white;
         text-align: left;
         width: 100%;
+        display: flex !important;
+        align-items: center !important; /* Forces text to center vertically */
+        min-height: 32px; /* Matches standard checkbox height */
     }
 
-    /* 5. Checkbox Centering & Height Fix */
+    /* 4. Checkbox Centering */
     div[data-testid="stCheckbox"] {
         margin: 0px !important;
         padding: 0px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        min-height: 32px;
     }
     
-    /* Remove the label padding that Streamlit adds by default */
     div[data-testid="stCheckbox"] label {
         margin-bottom: 0px !important;
     }
@@ -104,10 +99,7 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
     day_idx = days.index(target_day)
     task_input = c2.text_input("New Task Description", placeholder="Enter task name...")
     
-    existing_tasks = fetch_query("SELECT id, task_name FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, day_idx, start_date))
-    
-    btn_col1, btn_col2, btn_col3 = st.columns(3)
-    
+    btn_col1, _, _ = st.columns(3)
     if btn_col1.button("ADD TASK", use_container_width=True):
         if task_input:
             execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, False)", (user, day_idx, task_input, start_date))
@@ -143,7 +135,6 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # Tasks
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
                 t_c1, t_c2 = st.columns([0.2, 0.8], vertical_alignment="center")
@@ -155,5 +146,10 @@ for i, day_name in enumerate(days):
                         st.rerun()
                 
                 with t_c2:
-                    text_style = "text-decoration: line-through; color: #666;" if tdone else "color: white;"
-                    st.markdown(f"<p class='task-text' style='{text_style}'>{tname.upper()}</p>", unsafe_allow_html=True)
+                    text_decoration = "line-through" if tdone else "none"
+                    text_color = "#666" if tdone else "white"
+                    st.markdown(f"""
+                        <div class="task-text" style="text-decoration: {text_decoration}; color: {text_color};">
+                            {tname.upper()}
+                        </div>
+                    """, unsafe_allow_html=True)
