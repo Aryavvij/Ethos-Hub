@@ -18,7 +18,6 @@ start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 # --- CSS STYLING ---
-# --- CSS STYLING: TIGHT-WRAP BOXES ---
 st.markdown("""
     <style>
     .day-header {
