@@ -17,10 +17,10 @@ user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- CSS STYLING (The Professional Polish) ---
+# --- CSS STYLING ---
 st.markdown("""
     <style>
-    /* 1. Header & Circular Chart Scaling */
+    /* 1. Header Styling */
     .day-header {
         background: #76b372; 
         padding: 12px; 
@@ -28,95 +28,81 @@ st.markdown("""
         text-align: center; 
         color: white; 
         margin-bottom: 10px;
+        width: 100%; /* Ensures header defines the column width */
     }
-    .day-header strong { font-size: 20px !important; }
-    .day-header small { font-size: 15px !important; opacity: 0.9; }
+    .day-header strong { font-size: 18px !important; display: block; }
+    .day-header small { font-size: 14px !important; opacity: 0.9; }
 
+    /* 2. PROGRESS CHART: Matches Header Width & Aligned */
     .progress-wrapper {
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 10px 0;
-        min-height: 80px;
+        width: 100%; 
+        padding: 10px 0 20px 0;
     }
     .circular-chart {
-        display: block;
-        margin: 0 auto;
-        width: 60px !important;
-        height: 60px !important;
+        width: 85% !important; /* Scaled to visually match the header box width */
+        max-width: 100px;
+        height: auto;
     }
     .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
-    .circle { 
-        fill: none; 
-        stroke-width: 3.5; 
-        stroke: #76b372; 
-        stroke-linecap: round; 
-        transition: stroke-dasharray 0.3s ease; 
+    .circle { fill: none; stroke-width: 3.5; stroke: #76b372; stroke-linecap: round; }
+    
+    /* 3. TASK BOX: The Multi-Line Centering Fix */
+    /* This targets the Streamlit container and forces it to be a centered flex row */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0px !important;
     }
     
-    /* 2. Task Text (Cleaned up font) */
+    /* Force the internal row of the task to center everything vertically */
+    [data-testid="column"] {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important; 
+        align-items: center !important;
+    }
+
     .task-text {
-        font-size: 14px !important; 
-        font-weight: 600 !important
-        line-height: 1.3 !important;
+        font-size: 15px !important; 
+        font-weight: 600 !important; 
+        line-height: 1.2 !important;
         margin: 0 !important;
         color: white;
-        text-transform: uppercase;
+        text-align: left;
+        width: 100%;
     }
 
-    /* 3. Button Color Consistency */
-    div.stButton > button {
-        background-color: transparent !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        font-weight: 600 !important;
-    }
-    div.stButton > button:hover {
-        border-color: #76b372 !important;
-        color: #76b372 !important;
-    }
-
-    /* 4. Force Checkbox alignment */
-    [data-testid="stCheckbox"] {
+    /* 4. Checkbox Centering */
+    div[data-testid="stCheckbox"] {
+        margin-bottom: 0px !important;
         display: flex !important;
-        justify-content: center !important;
         align-items: center !important;
+        justify-content: center !important;
+        height: 100% !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🗓️ Weekly Planner")
 
-# --- THE TASK ARCHITECT (CENTRAL HUB) ---
+# --- TASK ARCHITECT ---
 with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
     c1, c2 = st.columns([1, 2])
     target_day = c1.selectbox("Select Day", days)
     day_idx = days.index(target_day)
-    task_input = c2.text_input("New Task Description", placeholder="Enter task name here...")
+    task_input = c2.text_input("New Task Description", placeholder="Enter task name...")
     
     existing_tasks = fetch_query("SELECT id, task_name FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, day_idx, start_date))
-
+    
     btn_col1, btn_col2, btn_col3 = st.columns(3)
+    
     if btn_col1.button("ADD TASK", use_container_width=True):
         if task_input:
             execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, False)", (user, day_idx, task_input, start_date))
             st.rerun()
 
-    if existing_tasks:
-        task_list = {t[1]: t[0] for t in existing_tasks}
-        selected_task_name = st.selectbox("Existing Tasks for " + target_day, options=list(task_list.keys()))
-        selected_id = task_list[selected_task_name]
-        
-        if btn_col2.button("RENAME TASK", use_container_width=True):
-            if task_input:
-                execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (task_input, selected_id))
-                st.rerun()
-                
-        if btn_col3.button("DELETE TASK", use_container_width=True):
-            execute_query("DELETE FROM weekly_planner WHERE id=%s", (selected_id,))
-            st.rerun()
-
-# --- 7-DAY GRID RENDERING ---
+# --- 7-DAY GRID ---
 cols = st.columns(7, gap="small")
 
 for i, day_name in enumerate(days):
@@ -129,15 +115,14 @@ for i, day_name in enumerate(days):
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
-        # Date Headers
         st.markdown(f"""
             <div class="day-header">
-                <strong>{day_name[:3].upper()}</strong><br>
+                <strong>{day_name[:3].upper()}</strong>
                 <small>{this_date.strftime('%d %b')}</small>
             </div>
         """, unsafe_allow_html=True)
         
-        # Circular Progress Chart
+        # Circular Progress (Width Aligned)
         st.markdown(f"""
             <div class="progress-wrapper">
                 <svg viewBox="0 0 36 36" class="circular-chart">
@@ -148,19 +133,16 @@ for i, day_name in enumerate(days):
             </div>
         """, unsafe_allow_html=True)
         
-        # Task Execution List
+        # Tasks
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
+
                 t_c1, t_c2 = st.columns([0.2, 0.8], vertical_alignment="center")
                 
                 with t_c1:
                     new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
                     if new_val != tdone:
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (new_val, tid))
-                        try:
-                            from services import invalidate_user_caches
-                            invalidate_user_caches()
-                        except: pass
                         st.rerun()
                 
                 with t_c2:
