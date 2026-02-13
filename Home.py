@@ -93,16 +93,16 @@ st.markdown(f"""
         border-radius: 12px;
         padding: 22px;
         margin-bottom: 20px;
-        height: 320px; /* SAME SIZE FOR ALL BOXES */
+        height: auto !important; 
+        min-height: 180px; /* Keeps a baseline size for empty cards */
+        
         transition: 0.3s ease;
-        overflow-y: auto;
     }}
-    .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
-    .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 18px; }}
-    .task-item {{ display: flex; align-items: center; margin-bottom: 12px; font-size: 14px; }}
-    .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; box-shadow: 0 0 5px {ETHOS_GREEN}; }}
-    .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
-    .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
+    /* Remove extra bottom margin from the last item inside the card */
+    .ethos-card > div:last-child {{
+        margin-bottom: 0px !important;
+        padding-bottom: 0px !important;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
