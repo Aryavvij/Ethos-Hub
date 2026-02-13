@@ -6,6 +6,10 @@ from psycopg2 import pool
 # --- CONFIGURATION ---
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
+@st.cache_data(ttl=600) 
+def fetch_timetable_cached(email):
+    return fetch_query("SELECT * FROM timetable WHERE user_email=%s", (email,))
+
 def get_pool(db_url):
     """
     Creates or retrieves a connection pool safely using Lazy Initialization.
