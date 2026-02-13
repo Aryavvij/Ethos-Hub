@@ -58,8 +58,9 @@ stats_query = fetch_query("""
 
 s = stats_query[0] if stats_query else (0, 0, 0, 0)
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Today's Focus", f"{int(s[0] or 0)}m")
-m2.metric("Daily Average", f"{int(s[1] or 0)}m")
+
+m1.metric("Today's Focus", f"{(s[0] or 0)/60:.1f}h")
+m2.metric("Daily Average", f"{(s[1] or 0)/60:.1f}h")
 m3.metric("Weekly Total", f"{(s[2] or 0)/60:.1f}h")
 m4.metric("Monthly Total", f"{(s[3] or 0)/60:.1f}h")
 
@@ -138,7 +139,7 @@ def timer_fragment():
                     execute_query("UPDATE active_sessions SET is_paused=False, start_time=%s WHERE user_email=%s", (dt.now(), user))
                     st.rerun()
 
-            if b2.button("🛑 STOP & LOG", use_container_width=True):
+            if b2.button("STOP & LOG", use_container_width=True):
                 duration = max(1, elapsed // 60)
                 execute_query("INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, CURRENT_DATE)", (user, task_name, duration))
                 execute_query("DELETE FROM active_sessions WHERE user_email=%s", (user,))
