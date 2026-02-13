@@ -17,76 +17,70 @@ user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- CSS STYLING (The Alignment & UI Fixes) ---
+# --- CSS STYLING (The Professional Polish) ---
 st.markdown("""
     <style>
     /* 1. Header & Circular Chart Scaling */
     .day-header {
         background: #76b372; 
-        padding: 10px; 
+        padding: 12px; 
         border-radius: 8px; 
         text-align: center; 
         color: white; 
-        margin-bottom: 5px;
+        margin-bottom: 10px;
     }
-    .day-header strong { font-size: 18px !important; }
-    .day-header small { font-size: 14px !important; opacity: 0.9; }
+    .day-header strong { font-size: 20px !important; }
+    .day-header small { font-size: 15px !important; opacity: 0.9; }
 
     .progress-wrapper {
         display: flex;
         justify-content: center;
-        padding: 5px 0 15px 0;
+        align-items: center;
+        padding: 10px 0;
+        min-height: 80px;
     }
     .circular-chart {
         display: block;
         margin: 0 auto;
-        max-width: 65px;
-        max-height: 65px;
+        width: 60px !important;
+        height: 60px !important;
     }
-    .circle-bg { fill: none; stroke: #333; stroke-width: 3.8; }
+    .circle-bg { fill: none; stroke: #333; stroke-width: 3.5; }
     .circle { 
         fill: none; 
-        stroke-width: 2.8; 
+        stroke-width: 3.5; 
         stroke: #76b372; 
         stroke-linecap: round; 
         transition: stroke-dasharray 0.3s ease; 
     }
     
-    /* 2. Task Box Vertical Centering (The Fix) */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        height: 100%;
-    }
-    /* This targets the column inside each task container to center the checkbox vertically */
-    [data-testid="column"] {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-    }
-
-    /* 3. Checkbox & Font Scaling */
-    [data-testid="stCheckbox"] {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    
+    /* 2. Task Text (Cleaned up font) */
     .task-text {
-        font-size: 17px !important; 
-        font-weight: 800 !important;
+        font-size: 14px !important; 
+        font-weight: 600 !important
         line-height: 1.3 !important;
         margin: 0 !important;
         color: white;
+        text-transform: uppercase;
     }
 
-    /* 4. Button Color Override (Making 'Add' match others) */
-    div.stButton > button:first-child {
+    /* 3. Button Color Consistency */
+    div.stButton > button {
         background-color: transparent !important;
         color: white !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        font-weight: 600 !important;
     }
     div.stButton > button:hover {
         border-color: #76b372 !important;
         color: #76b372 !important;
+    }
+
+    /* 4. Force Checkbox alignment */
+    [data-testid="stCheckbox"] {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -123,7 +117,7 @@ with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
             st.rerun()
 
 # --- 7-DAY GRID RENDERING ---
-cols = st.columns(7)
+cols = st.columns(7, gap="small")
 
 for i, day_name in enumerate(days):
     this_date = start_date + timedelta(days=i)
@@ -135,7 +129,7 @@ for i, day_name in enumerate(days):
     pct = int((done / total * 100)) if total > 0 else 0
     
     with cols[i]:
-        # Bigger Date Headers
+        # Date Headers
         st.markdown(f"""
             <div class="day-header">
                 <strong>{day_name[:3].upper()}</strong><br>
@@ -149,7 +143,7 @@ for i, day_name in enumerate(days):
                 <svg viewBox="0 0 36 36" class="circular-chart">
                     <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
                     <path class="circle" stroke-dasharray="{pct}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                    <text x="18" y="20.5" style="fill:#76b372; font-size:9px; text-anchor:middle; font-weight:bold;">{pct}%</text>
+                    <text x="18" y="20.5" style="fill:#76b372; font-size:10px; text-anchor:middle; font-weight:bold;">{pct}%</text>
                 </svg>
             </div>
         """, unsafe_allow_html=True)
@@ -157,7 +151,7 @@ for i, day_name in enumerate(days):
         # Task Execution List
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
-                t_c1, t_c2 = st.columns([0.25, 0.75])
+                t_c1, t_c2 = st.columns([0.2, 0.8], vertical_alignment="center")
                 
                 with t_c1:
                     new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
