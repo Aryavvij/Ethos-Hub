@@ -5,19 +5,18 @@ from utils import render_sidebar
 
 st.set_page_config(layout="wide", page_title="Weekly Planner", page_icon="🗓️")
 
-# --- GATEKEEPER ---
+# --- INITIALIZATION ---
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("Home.py")
     st.stop()
 
 render_sidebar()
 
-# --- INITIALIZATION ---
 user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-# --- CSS STYLING: TIGHT-WRAP BOXES ---
+# --- CSS STYLING: SYMMETRY & CENTERING ---
 st.markdown("""
     <style>
     .day-header {
@@ -26,11 +25,11 @@ st.markdown("""
     }
     .progress-wrapper {
         display: flex; justify-content: center; align-items: center;
-        width: 100%; padding: 10px 0 15px 0;
+        width: 100%; padding: 10px 0 20px 0;
     }
-    .circular-chart { width: 85% !important; max-width: 100px; height: auto; }
+    .circular-chart { width: 85% !important; max-width: 90px; height: auto; }
 
-    /* THE SHRINK-WRAP FIX */
+    /* TASK BOX WRAPPER */
     [data-testid="stVerticalBlockBorderWrapper"] {
         padding: 0px !important;
         margin-bottom: 8px !important;
@@ -41,13 +40,14 @@ st.markdown("""
         gap: 0rem !important;
     }
 
-    /* VERTICAL CENTERING */
+    /* THE ROW CENTERING FIX */
     [data-testid="column"] {
         display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important; 
-        align-items: flex-start !important;
-        padding: 4px 0px !important;
+        flex-direction: row !important;
+        align-items: center !important; 
+        justify-content: flex-start !important;
+        padding: 4px 10px !important;
+        min-height: 48px;
     }
 
     .task-text {
@@ -55,26 +55,16 @@ st.markdown("""
         font-weight: 600 !important; 
         line-height: 1.1 !important;
         margin: 0 !important;
+        padding-left: 10px !important;
         color: white;
-        display: flex;
-        align-items: center;
-        min-height: 24px;
+        text-align: left;
     }
 
     div[data-testid="stCheckbox"] {
         margin: 0px !important;
         padding: 0px !important;
-        min-height: 24px;
-        display: flex;
-        align-items: center;
-    }
-    
-    /* Action Buttons (Pencil/Trash) styling */
-    div[data-testid="column"] button {
-        padding: 0px !important;
-        border: none !important;
-        background: transparent !important;
-        font-size: 14px !important;
+        display: flex !important;
+        align-items: center !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -114,39 +104,26 @@ for i, day_name in enumerate(days):
         
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
-                # Columns: Checkbox | Text | Edit | Delete
-                t_c1, t_c2, t_c3, t_c4 = st.columns([0.15, 0.55, 0.15, 0.15], vertical_alignment="center")
-                
+                # Row: Tick | Text
+                t_c1, t_c2 = st.columns([0.25, 0.75], vertical_alignment="center")
                 with t_c1:
                     new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
                     if new_val != tdone:
                         execute_query("UPDATE weekly_planner SET is_done=%s WHERE id=%s", (new_val, tid))
                         st.rerun()
-                
                 with t_c2:
                     text_decoration = "line-through" if tdone else "none"
                     text_color = "#666" if tdone else "white"
                     st.markdown(f'<div class="task-text" style="text-decoration: {text_decoration}; color: {text_color};">{tname.upper()}</div>', unsafe_allow_html=True)
+            
+            # Action Dropdown 
+            with st.expander("ACTIONS", expanded=False):
+                new_title = st.text_input("Rename Task", value=tname, key=f"edit_in_{tid}", label_visibility="collapsed")
+                e_col1, e_col2 = st.columns(2)
+                if e_col1.button("SAVE", key=f"sv_{tid}", use_container_width=True):
+                    execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (new_title, tid))
+                    st.rerun()
                 
-                with t_c3:
-                    if st.button("", key=f"ed_{tid}"):
-                        st.session_state[f"editing_{tid}"] = True
-                        st.rerun()
-                
-                with t_c4:
-                    if st.button("", key=f"del_{tid}"):
-                        execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
-                        st.rerun()
-
-            # Inline Editor
-            if st.session_state.get(f"editing_{tid}", False):
-                with st.container(border=True):
-                    new_name = st.text_input("Rename", value=tname, key=f"input_{tid}")
-                    es1, es2 = st.columns(2)
-                    if es1.button("SAVE", key=f"sv_{tid}", use_container_width=True):
-                        execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (new_name, tid))
-                        st.session_state[f"editing_{tid}"] = False
-                        st.rerun()
-                    if es2.button("X", key=f"cn_{tid}", use_container_width=True):
-                        st.session_state[f"editing_{tid}"] = False
-                        st.rerun()
+                if e_col2.button("DELETE", key=f"del_{tid}", use_container_width=True, type="secondary"):
+                    execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
+                    st.rerun()
