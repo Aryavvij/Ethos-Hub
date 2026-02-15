@@ -146,19 +146,50 @@ def timer_fragment():
                 st.rerun()
 
     with col_log:
-        st.subheader("Focus Logs")
-        log_date = st.date_input("Date", dt.now().date())
-        today_data = fetch_query("SELECT id, task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s ORDER BY id DESC", (user, log_date))
+        st.subheader("Session Management")
+        manage_date = st.date_input("Target Date", dt.now().date(), key="manage_date")
+        day_sessions = fetch_query("SELECT id, task_name, duration_mins FROM focus_sessions WHERE user_email=%s AND session_date = %s ORDER BY id DESC", (user, manage_date))
         
-        if today_data:
-            log_df = pd.DataFrame(today_data, columns=["ID", "Objective", "Duration"])
+        # --- MANUAL ACTIONS DROPDOWN ---
+        action = st.selectbox("Action", ["Add Manual Session", "Edit Session", "Delete Session"], index=0)
+        
+        if action == "Add Manual Session":
+            c1, c2 = st.columns(2)
+            m_task = c1.text_input("Objective", placeholder="Retroactive Log")
+            m_duration = c2.number_input("Minutes", min_value=1, step=1, value=25)
+            if st.button("MANUAL LOG", use_container_width=True):
+                execute_query("INSERT INTO focus_sessions (user_email, task_name, duration_mins, session_date) VALUES (%s, %s, %s, %s)", (user, m_task, m_duration, manage_date))
+                st.success(f"Added {m_duration}m to {manage_date}")
+                st.rerun()
+
+        elif action == "Edit Session" and day_sessions:
+            session_map = {f"{row[1]} ({row[2]}m)": row[0] for row in day_sessions}
+            selected_label = st.selectbox("Select Session to Edit", list(session_map.keys()))
+            session_id = session_map[selected_label]
+            
+            current_row = [r for r in day_sessions if r[0] == session_id][0]
+            
+            c1, c2 = st.columns(2)
+            edit_task = c1.text_input("Edit Objective", value=current_row[1])
+            edit_mins = c2.number_input("Edit Minutes", value=int(current_row[2]))
+            if st.button("SAVE CHANGES", use_container_width=True):
+                execute_query("UPDATE focus_sessions SET task_name=%s, duration_mins=%s WHERE id=%s", (edit_task, edit_mins, session_id))
+                st.rerun()
+
+        elif action == "Delete Session" and day_sessions:
+            session_map = {f"{row[1]} ({row[2]}m)": row[0] for row in day_sessions}
+            selected_label = st.selectbox("Select Session to Delete", list(session_map.keys()))
+            if st.button("CONFIRM DELETE", use_container_width=True, type="primary"):
+                execute_query("DELETE FROM focus_sessions WHERE id=%s", (session_map[selected_label],))
+                st.rerun()
+
+        st.markdown("---")
+        st.subheader("Focus Logs")
+        if day_sessions:
+            log_df = pd.DataFrame(day_sessions, columns=["ID", "Objective", "Duration"])
             log_df["Spent"] = log_df["Duration"].apply(lambda m: f"{m//60}h {m%60}m" if m>=60 else f"{m}m")
             st.dataframe(log_df[["Objective", "Spent"]], use_container_width=True, hide_index=True)
-            
-            if st.button("Clear History (Today)", key="clear_logs"):
-                execute_query("DELETE FROM focus_sessions WHERE user_email=%s AND session_date=CURRENT_DATE", (user,))
-                st.rerun()
         else:
-            st.caption("No logs for this date.")
+            st.caption(f"No logs found for {manage_date}")
 
 timer_fragment()
