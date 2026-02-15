@@ -19,6 +19,7 @@ days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 # --- CSS STYLING: SYMMETRY & CENTERING ---
 st.markdown("""
     <style>
+    /* 1. Header & Chart Alignment */
     .day-header {
         background: #76b372; padding: 12px; border-radius: 8px; 
         text-align: center; color: white; margin-bottom: 10px; width: 100%;
@@ -29,7 +30,7 @@ st.markdown("""
     }
     .circular-chart { width: 85% !important; max-width: 90px; height: auto; }
 
-    /* TASK BOX WRAPPER */
+    /* 2. THE TIGHT-WRAP TASK BOX */
     [data-testid="stVerticalBlockBorderWrapper"] {
         padding: 0px !important;
         margin-bottom: 8px !important;
@@ -40,50 +41,73 @@ st.markdown("""
         gap: 0rem !important;
     }
 
-    /* THE ROW CENTERING FIX */
+    /* 3. ROW CENTERING: Forces Tick + Text to Midline */
     [data-testid="column"] {
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important; 
         justify-content: flex-start !important;
-        padding: 4px 10px !important;
+        padding: 8px 12px !important; /* Balanced internal breathing room */
         min-height: 48px;
     }
 
     .task-text {
-        font-size: 13px !important; 
+        font-size: 13px !important; /* Scaled down for better fit */
         font-weight: 600 !important; 
         line-height: 1.1 !important;
         margin: 0 !important;
-        padding-left: 10px !important;
+        padding-left: 10px !important; /* Space between tick and text */
         color: white;
         text-align: left;
+        display: flex;
+        align-items: center;
     }
 
+    /* Checkbox Centering */
     div[data-testid="stCheckbox"] {
         margin: 0px !important;
         padding: 0px !important;
         display: flex !important;
         align-items: center !important;
     }
+    
+    div[data-testid="stCheckbox"] label {
+        margin-bottom: 0px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🗓️ Weekly Planner")
 
-# --- TASK ARCHITECT ---
-with st.expander("TASK ARCHITECT (Manage Week)", expanded=False):
+# --- 1. THE CENTRALIZED TASK ARCHITECT ---
+with st.expander("🛠️ TASK ARCHITECT (Add / Edit / Delete)", expanded=False):
     c1, c2 = st.columns([1, 2])
-    target_day = c1.selectbox("Select Day", days)
+    target_day = c1.selectbox("Select Day to Manage", days)
     day_idx = days.index(target_day)
-    task_input = c2.text_input("New Task Description", placeholder="Enter task name...")
     
-    if st.button("ADD TASK", use_container_width=True, type="primary"):
+    current_tasks = fetch_query("SELECT id, task_name FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s ORDER BY id ASC", (user, day_idx, start_date))
+    
+    st.markdown("---")
+    task_input = st.text_input("Add New Task", placeholder="E.g., FINISH PROJECT", key="add_input")
+    if st.button("COMMIT NEW TASK", use_container_width=True, type="primary"):
         if task_input:
             execute_query("INSERT INTO weekly_planner (user_email, day_index, task_name, week_start, is_done) VALUES (%s, %s, %s, %s, False)", (user, day_idx, task_input, start_date))
             st.rerun()
 
-# --- 7-DAY GRID ---
+    if current_tasks:
+        st.markdown("---")
+        st.write(f"**Manage {target_day} Tasks**")
+        for tid, tname in current_tasks:
+            ec1, ec2, ec3 = st.columns([0.6, 0.2, 0.2])
+            new_name = ec1.text_input("Label", value=tname, key=f"edit_{tid}", label_visibility="collapsed")
+            if ec2.button("UPDATE", key=f"upd_{tid}", use_container_width=True):
+                execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (new_name, tid))
+                st.rerun()
+            if ec3.button("DEL", key=f"del_{tid}", use_container_width=True):
+                execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
+                st.rerun()
+
+# --- 2. THE 7-DAY GRID (TRACKING ONLY) ---
 cols = st.columns(7, gap="small")
 
 for i, day_name in enumerate(days):
@@ -97,6 +121,7 @@ for i, day_name in enumerate(days):
     with cols[i]:
         st.markdown(f'<div class="day-header"><strong>{day_name[:3].upper()}</strong><br><small>{this_date.strftime("%d %b")}</small></div>', unsafe_allow_html=True)
         
+        # Circular Chart
         st.markdown(f'''<div class="progress-wrapper"><svg viewBox="0 0 36 36" class="circular-chart">
             <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
             <path class="circle" stroke-dasharray="{pct}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
@@ -104,7 +129,6 @@ for i, day_name in enumerate(days):
         
         for tid, tname, tdone in day_tasks:
             with st.container(border=True):
-                # Row: Tick | Text
                 t_c1, t_c2 = st.columns([0.25, 0.75], vertical_alignment="center")
                 with t_c1:
                     new_val = st.checkbox("", value=tdone, key=f"chk_{tid}", label_visibility="collapsed")
@@ -115,15 +139,3 @@ for i, day_name in enumerate(days):
                     text_decoration = "line-through" if tdone else "none"
                     text_color = "#666" if tdone else "white"
                     st.markdown(f'<div class="task-text" style="text-decoration: {text_decoration}; color: {text_color};">{tname.upper()}</div>', unsafe_allow_html=True)
-            
-            # Action Dropdown 
-            with st.expander("ACTIONS", expanded=False):
-                new_title = st.text_input("Rename Task", value=tname, key=f"edit_in_{tid}", label_visibility="collapsed")
-                e_col1, e_col2 = st.columns(2)
-                if e_col1.button("SAVE", key=f"sv_{tid}", use_container_width=True):
-                    execute_query("UPDATE weekly_planner SET task_name=%s WHERE id=%s", (new_title, tid))
-                    st.rerun()
-                
-                if e_col2.button("DELETE", key=f"del_{tid}", use_container_width=True, type="secondary"):
-                    execute_query("DELETE FROM weekly_planner WHERE id=%s", (tid,))
-                    st.rerun()
