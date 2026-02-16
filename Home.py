@@ -1,7 +1,7 @@
 import streamlit as st
 import hashlib
 import jwt
-import datetime
+import html
 from datetime import datetime as dt, timedelta
 from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
@@ -18,14 +18,6 @@ ETHOS_GREEN = "#76b372"
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
 cookie_name = "ethos_user_token"
-
-if login_successful:
-    Telemetry.log('AUTH', 'Login_Success', metadata={'ip_obscured': 'true'})
-else:
-    Telemetry.log('AUTH', 'Login_Failure', metadata={'attempted_email': e_in})
-res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
-if res:
-    st.session_state.role = res[0][1] 
 
 # --- 2. AUTH UTILITIES ---
 def create_jwt(email):
@@ -57,7 +49,7 @@ if not st.session_state.logged_in:
                 controller.set(cookie_name, create_jwt(email))
             st.rerun()
 
-# --- LOGIN SCREEN ---
+# LOGIN SCREEN
 if not st.session_state.logged_in:
     st.markdown(f"""<style>div.stButton > button[kind="primary"] {{ background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(118, 179, 114, 0.2) !important; color: white !important; border-radius: 8px !important; transition: all 0.3s ease !important; height: 3rem !important; }}</style>""", unsafe_allow_html=True)
     
@@ -71,19 +63,28 @@ if not st.session_state.logged_in:
         if st.button("INITIATE SESSION", use_container_width=True, type="primary"):
             if not check_rate_limit(limit=5, window=60):
                 st.error("Too many attempts. System cooling down for 60s.")
+                Telemetry.log('SECURITY', 'Rate_Limit_Hit', metadata={'email': e_in})
             else:
                 res = fetch_query("SELECT password FROM users WHERE email=%s", (e_in,))
                 if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
+                    Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
                     st.session_state.logged_in = True
                     st.session_state.user_email = e_in
                     controller.set(cookie_name, create_jwt(e_in))
-                    st.rerun()
+                    
+                    # Check for redirect cookie
+                    last_page = controller.get("ethos_last_page")
+                    if last_page and last_page != "Home":
+                        controller.remove("ethos_last_page")
+                        st.switch_page(f"pages/{last_page}.py")
+                    else:
+                        st.rerun()
                 else: 
+                    Telemetry.log('AUTH', 'Login_Failure', metadata={'attempted_email': e_in})
                     st.error("Wrong Password or Username")
     
     with t2:
         st.info("Registration requires administrator clearance.")
-        
     st.stop()
 
 # --- 4. DASHBOARD RENDERING ---
@@ -94,7 +95,6 @@ t_date = now.date()
 d_idx = t_date.weekday()
 w_start = t_date - timedelta(days=d_idx)
 
-# Replace the CSS block in your Home.py
 st.markdown(f"""
     <style>
     .ethos-card {{
@@ -115,7 +115,6 @@ st.markdown(f"""
         align-items: center; 
         margin-bottom: 8px; 
         font-size: 14px; 
-        padding-top: 0px !important;
     }}
     
     [data-testid="stVerticalBlock"] > div {{
@@ -140,34 +139,37 @@ class TaskSchema(BaseModel):
     is_done: bool
 
 with r1_c1: # PROTOCOL CARD
-    raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
+    with Telemetry.track_latency("Home_Protocol_Fetch"):
+        raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
     content = ""
     for row in raw_tasks[:5]:
         try:
             t = TaskSchema(name=row[0], is_done=row[1]) 
+            safe_name = html.escape(t.name) 
             color = "gray" if t.is_done else "white"
-            content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{t.name.upper()}</span></div>'
+            content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{safe_name.upper()}</span></div>'
         except ValidationError: continue
-    
     st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 with r1_c2: # TIMELINE CARD
     current_day_name = now.strftime('%A')
     t_time = now.strftime('%H:%M:%S')
-    
     all_today = fetch_query("SELECT subject, start_time FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, current_day_name))
-    
     future_acts = [row for row in all_today if str(row[1]) >= t_time]
     display_acts = future_acts[:5] if len(future_acts) >= 1 else all_today[-5:]
     
-    content = "".join([f'<div class="task-item"><span style="color:{ETHOS_GREEN}; margin-right:10px;">{row[1]}</span> {row[0].upper()}</div>' for row in display_acts])
+    content = ""
+    for row in display_acts:
+        safe_sub = html.escape(str(row[0]))
+        content += f'<div class="task-item"><span style="color:{ETHOS_GREEN}; margin-right:10px;">{row[1]}</span> {safe_sub.upper()}</div>'
     st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Current & Upcoming</div>{content or "No Activities"}</div>', unsafe_allow_html=True)
 
 with r1_c3: # BLUEPRINT CARD
     blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 4", (user,))
     content = ""
     for desc, prog in blueprint:
-        content += f'''<div style="margin-bottom:15px;"><div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;"><span>{desc[:20].upper()}</span><span>{int(prog)}%</span></div>
+        safe_desc = html.escape(desc[:20]) 
+        content += f'''<div style="margin-bottom:15px;"><div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;"><span>{safe_desc.upper()}</span><span>{int(prog)}%</span></div>
                     <div style="background:#333; height:4px; border-radius:2px;"><div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>'''
     st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
@@ -181,10 +183,16 @@ with r2_c1: # FINANCIAL CARD
 
 with r2_c2: # NEURAL LOCK CARD
     logs = FocusService.get_daily_logs(user, t_date)
-    content = "".join([f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px;"><span>{row.task_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>' for row in logs[:6]])
+    content = ""
+    for row in logs[:6]:
+        safe_log_name = html.escape(row.task_name) # XSS Protection
+        content += f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px;"><span>{safe_log_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>'
     st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
 
 with r2_c3: # EVENTS CARD
     events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 5", (user, t_date))
-    content = "".join([f'<div class="task-item"><div class="status-pip"></div><b>{row[1].strftime("%b %d")}</b>: {row[0]}</div>' for row in events])
+    content = ""
+    for row in events:
+        safe_evt = html.escape(row[0]) # XSS Protection
+        content += f'<div class="task-item"><div class="status-pip"></div><b>{row[1].strftime("%b %d")}</b>: {safe_evt}</div>'
     st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
