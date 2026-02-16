@@ -39,15 +39,21 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    token = controller.get(cookie_name)
-    if token:
-        email, refresh_needed = verify_jwt(token)
-        if email:
-            st.session_state.logged_in = True
-            st.session_state.user_email = email
-            if refresh_needed:
-                controller.set(cookie_name, create_jwt(email))
-            st.rerun()
+    try:
+        all_cookies = controller.get_all()
+        
+        if all_cookies and cookie_name in all_cookies:
+            token = all_cookies.get(cookie_name)
+            email, refresh_needed = verify_jwt(token)
+            
+            if email:
+                st.session_state.logged_in = True
+                st.session_state.user_email = email
+                if refresh_needed:
+                    controller.set(cookie_name, create_jwt(email))
+                st.rerun()
+    except Exception as e:
+        pass
 
 # LOGIN SCREEN
 if not st.session_state.logged_in:
@@ -72,7 +78,6 @@ if not st.session_state.logged_in:
                     st.session_state.user_email = e_in
                     controller.set(cookie_name, create_jwt(e_in))
                     
-                    # Check for redirect cookie
                     last_page = controller.get("ethos_last_page")
                     if last_page and last_page != "Home":
                         controller.remove("ethos_last_page")
