@@ -6,9 +6,9 @@ import traceback
 from datetime import datetime as dt, timedelta
 from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
-from services import FocusService, FinanceService
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
+from services.logic import FocusService, FinanceService
 from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
