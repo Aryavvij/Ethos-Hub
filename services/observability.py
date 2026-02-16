@@ -1,11 +1,12 @@
 import time
 import streamlit as st
-from database import execute_query
 
 class Telemetry:
     @staticmethod
     def log(category, event_name, value=0.0, metadata=None):
-        """Universal logger for the Ethos System."""
+        """Universal logger with lazy import to prevent circularity."""
+        from database import execute_query 
+        
         user = st.session_state.get('user_email', 'ANONYMOUS')
         execute_query(
             "INSERT INTO system_metrics (user_email, category, event_name, value, metadata) VALUES (%s, %s, %s, %s, %s)",
@@ -14,7 +15,6 @@ class Telemetry:
 
     @staticmethod
     def track_latency(event_name):
-        """Context manager to track how long a block of code takes to run."""
         class LatencyTracker:
             def __enter__(self):
                 self.start = time.time()
