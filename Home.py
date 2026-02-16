@@ -8,6 +8,7 @@ from utils import render_sidebar, check_rate_limit
 from services import FocusService, FinanceService
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
+from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
 JWT_SECRET = "ethos_super_secret_key_123" 
@@ -17,6 +18,11 @@ ETHOS_GREEN = "#76b372"
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 controller = CookieController()
 cookie_name = "ethos_user_token"
+
+if login_successful:
+    Telemetry.log('AUTH', 'Login_Success', metadata={'ip_obscured': 'true'})
+else:
+    Telemetry.log('AUTH', 'Login_Failure', metadata={'attempted_email': e_in})
 
 # --- 2. AUTH UTILITIES ---
 def create_jwt(email):
