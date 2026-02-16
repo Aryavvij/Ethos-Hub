@@ -4,7 +4,7 @@ from typing import List, Tuple
 import streamlit as st
 import calendar
 from utils import check_rate_limit 
-from observability import Telemetry
+from services.observability import Telemetry 
 
 # --- 1. SCHEMAS ---
 class FocusSession(BaseModel):
