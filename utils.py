@@ -1,6 +1,34 @@
 import streamlit as st
 import time
 from streamlit_cookies_controller import CookieController
+import functools
+import traceback
+from services.observability import Telemetry
+
+def ethos_observe(page_name):
+    """Decorator to automatically track performance and catch errors for any page."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            Telemetry.log('AUTH', 'Page_Access', metadata={'page': page_name})
+            
+            # 1. Track Performance & Catch Crashes
+            try:
+                with Telemetry.track_latency(f"Page_Load: {page_name}"):
+                    return func(*args, **kwargs)
+            except Exception as e:
+                # 2. Log Crash Details for Admin Page
+                error_info = {
+                    "error": str(e),
+                    "stack_trace": traceback.format_exc(),
+                    "page": page_name
+                }
+                Telemetry.log('ERROR', 'Global_Page_Crash', metadata=error_info)
+                st.error(f"ETHOS: {page_name} link unstable. Recalibrating...")
+                if st.button("RE-SYNC SYSTEM"):
+                    st.rerun()
+        return wrapper
+    return decorator
 
 def check_rate_limit(limit=10, window=60):
     """
