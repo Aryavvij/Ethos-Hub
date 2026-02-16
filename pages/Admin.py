@@ -12,9 +12,8 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("Home.py")
     st.stop()
 
-if st.session_state.user_email != ADMIN_EMAIL:
-    st.error("ACCESS DENIED: Insufficient Clearances.")
-    Telemetry.log('SECURITY', 'Unauthorized_Admin_Access', 1.0)
+if st.session_state.get('role') != 'admin':
+    st.error("RESTRICTED AREA: Administrators Only.")
     st.stop()
 
 st.set_page_config(layout="wide", page_title="System Watch", page_icon="📡")
