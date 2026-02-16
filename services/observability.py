@@ -4,7 +4,7 @@ import streamlit as st
 class Telemetry:
     @staticmethod
     def log(category, event_name, value=0.0, metadata=None):
-        """Universal logger with Lazy Import to break circular dependencies."""
+        """Universal logger using a Local Import to break the circular loop."""
         from database import execute_query 
         
         user = st.session_state.get('user_email', 'ANONYMOUS')
@@ -15,7 +15,6 @@ class Telemetry:
 
     @staticmethod
     def track_latency(event_name):
-        """Context manager to measure execution time."""
         class LatencyTracker:
             def __enter__(self):
                 self.start = time.time()
