@@ -23,6 +23,9 @@ if login_successful:
     Telemetry.log('AUTH', 'Login_Success', metadata={'ip_obscured': 'true'})
 else:
     Telemetry.log('AUTH', 'Login_Failure', metadata={'attempted_email': e_in})
+res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
+if res:
+    st.session_state.role = res[0][1] 
 
 # --- 2. AUTH UTILITIES ---
 def create_jwt(email):
