@@ -37,24 +37,32 @@ def get_shard_url(user_email=None):
     return DATABASE_URL
 
 def execute_query(query, params=None, user_email=None):
-    """Executes a write query using Connection Pooling."""
+    """Executes data mutations using Connection Pooling with integrated Observability."""
     url = get_shard_url(user_email)
     db_pool = get_pool(url)
+    
     if not db_pool: 
+        Telemetry.log('ERROR', 'DB_Pool_Unavailable_Execute', metadata={'user': user_email})
         return
     
-    conn = db_pool.getconn() 
-    try:
-        with conn.cursor() as cur:
-            cur.execute(query, params)
-            conn.commit()
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        st.error(f"Database Execution Error: {e}")
-    finally:
-        if db_pool and conn:
-            db_pool.putconn(conn) 
+    with Telemetry.track_latency(f"DB_Execute: {query[:30]}..."):
+        conn = None
+        try:
+            conn = db_pool.getconn()
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                conn.commit() 
+        except Exception as e:
+            Telemetry.log('ERROR', 'Database_Execute_Failure', metadata={
+                'error': str(e),
+                'query': query,
+                'user': user_email
+            })
+            
+            st.error("ETHOS: Command failed to synchronize. Data integrity preserved.")
+        finally:
+            if conn:
+                db_pool.putconn(conn)
 
 def fetch_query(query, params=None, user_email=None):
     """Fetches data using Connection Pooling with integrated Observability."""
