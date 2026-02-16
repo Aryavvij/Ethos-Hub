@@ -12,6 +12,11 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 
 render_sidebar()
 
+from services.observability import Telemetry
+
+with Telemetry.track_latency("Weekly_Task_Fetch"):
+    day_tasks = fetch_query("SELECT id, task_name, is_done FROM weekly_planner WHERE ...", (user, i, start_date))
+
 user = st.session_state.user_email
 start_date = datetime.now().date() - timedelta(days=datetime.now().weekday())
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
