@@ -23,11 +23,10 @@ if not (is_admin_email or is_admin_role):
 render_sidebar()
 
 # --- 2. HEADER ---
-st.title("📡 System Observability")
+st.title("🌐 System Health Observability")
 st.caption("Real-time telemetry and performance monitoring across the ETHOS ecosystem.")
 
 # --- 3. GLOBAL SYSTEM HEALTH MAP ---
-st.subheader("🌐 Global System Health")
 health_data = fetch_query("""
     SELECT metadata->>'page' as page_name, 
            COUNT(CASE WHEN category = 'ERROR' THEN 1 END) as crash_count
