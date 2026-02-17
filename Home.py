@@ -8,7 +8,7 @@ from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
-from services.logic import FocusService, FinanceService 
+from services.services import FocusService, FinanceService
 from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
@@ -18,10 +18,11 @@ ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 
-# Initialize cookie controller to persist session
-if 'controller' not in st.session_state:
-    st.session_state.controller = CookieController()
-controller = st.session_state.controller
+@st.cache_resource
+def get_cookie_controller():
+    return CookieController()
+
+controller = get_cookie_controller()
 cookie_name = "ethos_user_token"
 
 # --- 2. AUTH UTILITIES ---
@@ -43,71 +44,42 @@ def verify_jwt(token):
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-if not st.session_state.logged_in:
+if not st.session_state.logged_in and "cookie_checked" not in st.session_state:
     try:
         all_cookies = controller.get_all()
         if all_cookies and cookie_name in all_cookies:
             token = all_cookies.get(cookie_name)
             email, refresh_needed = verify_jwt(token)
-            
             if email:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
-                if refresh_needed:
-                    controller.set(cookie_name, create_jwt(email))
+                st.session_state.cookie_checked = True
                 st.rerun()
-    except Exception:
-        pass 
+    except: pass
 
 # --- LOGIN SCREEN ---
 if not st.session_state.logged_in:
-    st.markdown(f"""<style>
-        div.stButton > button[kind="primary"] {{ 
-            background-color: rgba(255, 255, 255, 0.05) !important; 
-            border: 1px solid {ETHOS_GREEN}77 !important; 
-            color: white !important; 
-            border-radius: 8px !important; 
-            height: 3.5rem !important;
-            transition: all 0.3s ease;
-        }}
-        div.stButton > button[kind="primary"]:hover {{
-            background-color: rgba(118, 179, 114, 0.1) !important;
-            border-color: {ETHOS_GREEN} !important;
-        }}
-    </style>""", unsafe_allow_html=True)
-    
     st.title("ETHOS SYSTEM ACCESS")
-    t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
     
-    with t1:
-        with st.form("login_form", clear_on_submit=False):
-            e_in = st.text_input("Email", autocomplete="username")
-            p_in = st.text_input("Password", type='password', autocomplete="current-password")
-            submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
-            
-            if submit:
-                if not check_rate_limit(limit=5, window=60):
-                    st.error("Too many attempts. System cooling down.")
+    with st.form("login_form"):
+        e_in = st.text_input("Email", autocomplete="username")
+        p_in = st.text_input("Password", type='password', autocomplete="current-password")
+        submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
+            with st.status("Verifying Neural Link...") as s:
+                res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
+                
+                if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = e_in
+                    st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
+                    
+                    controller.set(cookie_name, create_jwt(e_in))
+                    s.update(label="Access Granted", state="complete")
+                    
+                    Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
+                    st.rerun()
                 else:
-                    with st.status("Verifying Neural Link...", expanded=False) as status:
-                        res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
-                        
-                        if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                            status.update(label="Access Granted. Syncing...", state="complete")
-                            
-                            st.session_state.logged_in = True
-                            st.session_state.user_email = e_in
-                            st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
-                            
-                            controller.set(cookie_name, create_jwt(e_in))
-                            Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
-                            st.rerun()
-                        else: 
-                            status.update(label="Access Denied.", state="error")
-                            st.error("Invalid credentials.")
-    
-    with t2:
-        st.info("Registration requires administrator clearance.")
+                    st.error("Invalid credentials.")
     st.stop()
 
 # --- 4. DASHBOARD RENDERING ---
