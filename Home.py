@@ -8,7 +8,7 @@ from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
-from services.logic import FocusService, FinanceService
+from services.services import FocusService, FinanceService
 from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
@@ -18,17 +18,15 @@ ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 
-# FIX: Initialize the controller in session_state to avoid CachedWidgetWarning
+# Initialize controller in session state to prevent widget initialization lag
 if 'controller' not in st.session_state:
     st.session_state.controller = CookieController()
-
 controller = st.session_state.controller
 cookie_name = "ethos_user_token"
 
 # --- 2. AUTH UTILITIES ---
 def create_jwt(email):
-    payload = {"email": email, "exp": dt.utcnow() + timedelta(days=30)}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+    return jwt.encode({"email": email, "exp": dt.utcnow() + timedelta(days=30)}, JWT_SECRET, algorithm=JWT_ALGO)
 
 def verify_jwt(token):
     try:
@@ -44,18 +42,16 @@ def verify_jwt(token):
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
+# Quick Cookie Check (Only runs once)
 if not st.session_state.logged_in:
     try:
         all_cookies = controller.get_all()
         if all_cookies and cookie_name in all_cookies:
             token = all_cookies.get(cookie_name)
             email, refresh_needed = verify_jwt(token)
-            
             if email:
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
-                if refresh_needed:
-                    controller.set(cookie_name, create_jwt(email))
                 st.rerun()
     except Exception:
         pass 
@@ -69,52 +65,44 @@ if not st.session_state.logged_in:
             color: white !important; 
             border-radius: 8px !important; 
             height: 3.5rem !important;
-            transition: all 0.3s ease;
         }}
     </style>""", unsafe_allow_html=True)
     
     st.title("ETHOS SYSTEM ACCESS")
-    t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
     
-    with t1:
-        # Form prevents the "eternity" lag by stopping character-by-character refreshes
-        with st.form("login_form", clear_on_submit=False):
-            e_in = st.text_input("Email", autocomplete="username")
-            p_in = st.text_input("Password", type='password', autocomplete="current-password")
-            submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
-            
-            if submit:
-                if not check_rate_limit(limit=5, window=60):
-                    st.error("Too many attempts. System cooling down.")
-                else:
-                    with st.status("Verifying Neural Link...", expanded=False) as status:
-                        # Database check
-                        res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
-                        
-                        if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                            status.update(label="Access Granted. Syncing...", state="complete")
-                            
-                            st.session_state.logged_in = True
-                            st.session_state.user_email = e_in
-                            st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
-                            
-                            # Write cookie & log
-                            controller.set(cookie_name, create_jwt(e_in))
-                            Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
-                            
-                            st.rerun()
-                        else: 
-                            status.update(label="Access Denied.", state="error")
-                            st.error("Invalid credentials.")
-    
-    with t2:
-        st.info("Registration requires administrator clearance.")
+    # Form blocks character-by-character refreshing
+    with st.form("login_form", clear_on_submit=False):
+        e_in = st.text_input("Email", autocomplete="username")
+        p_in = st.text_input("Password", type='password', autocomplete="current-password")
+        submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
+        
+        if submit:
+            # We use a simple spinner here because st.status adds overhead
+            with st.spinner("⚡ SYNCHRONIZING..."):
+                # Single, focused DB call
+                res = fetch_query("SELECT password, role FROM users WHERE email=%s LIMIT 1", (e_in,))
+                
+                if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
+                    # 1. IMMEDIATE STATE UPDATE (This makes it feel fast)
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = e_in
+                    st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
+                    
+                    # 2. BACKGROUND TASKS (Cookie/Logs)
+                    controller.set(cookie_name, create_jwt(e_in))
+                    Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
+                    
+                    # 3. GO!
+                    st.rerun()
+                else: 
+                    st.error("Invalid credentials.")
     st.stop()
 
-# --- 4. DASHBOARD RENDERING (GLOBAL ERROR BOUNDARY) ---
+# --- 4. DASHBOARD RENDERING ---
 try:
     user = st.session_state.user_email
     render_sidebar()
+    
     now = dt.now()
     t_date = now.date()
     d_idx = t_date.weekday()
@@ -127,11 +115,11 @@ try:
             border: 1px solid rgba(118, 179, 114, 0.15);
             border-radius: 12px;
             padding: 22px; margin-bottom: 20px; height: 280px;
-            transition: 0.3s ease; overflow-y: hidden;
+            transition: 0.3s ease; overflow: hidden;
         }}
         .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
         .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
-        .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }}
+        .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; color: white; }}
         .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
         .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
         .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
@@ -141,7 +129,7 @@ try:
     st.title("ETHOS COMMAND")
     st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date.strftime('%A, %b %d')}")
 
-    # --- 5. GRID LAYOUT ---
+    # --- 5. GRID CONTENT ---
     r1_c1, r1_c2, r1_c3 = st.columns(3)
 
     class TaskSchema(BaseModel):
@@ -206,7 +194,7 @@ try:
         st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 except Exception as e:
-    Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e), "page": "Home.py"})
+    Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e)})
     st.error("ETHOS: A neural glitch occurred. Command Center is recalibrating.")
     if st.button("RE-INITIALIZE SYSTEM"):
         st.rerun()
