@@ -8,7 +8,7 @@ from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
-from services.logic import FocusService, FinanceService
+from services.logic import FocusService, FinanceService 
 from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
@@ -18,6 +18,7 @@ ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 
+# Initialize cookie controller to persist session
 if 'controller' not in st.session_state:
     st.session_state.controller = CookieController()
 controller = st.session_state.controller
@@ -67,6 +68,11 @@ if not st.session_state.logged_in:
             color: white !important; 
             border-radius: 8px !important; 
             height: 3.5rem !important;
+            transition: all 0.3s ease;
+        }}
+        div.stButton > button[kind="primary"]:hover {{
+            background-color: rgba(118, 179, 114, 0.1) !important;
+            border-color: {ETHOS_GREEN} !important;
         }}
     </style>""", unsafe_allow_html=True)
     
@@ -84,7 +90,6 @@ if not st.session_state.logged_in:
                     st.error("Too many attempts. System cooling down.")
                 else:
                     with st.status("Verifying Neural Link...", expanded=False) as status:
-                        # 1. Fetch user data
                         res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
                         
                         if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
@@ -96,7 +101,6 @@ if not st.session_state.logged_in:
                             
                             controller.set(cookie_name, create_jwt(e_in))
                             Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
-                            
                             st.rerun()
                         else: 
                             status.update(label="Access Denied.", state="error")
@@ -106,7 +110,7 @@ if not st.session_state.logged_in:
         st.info("Registration requires administrator clearance.")
     st.stop()
 
-# --- 4. DASHBOARD RENDERING (GLOBAL ERROR BOUNDARY) ---
+# --- 4. DASHBOARD RENDERING ---
 try:
     user = st.session_state.user_email
     render_sidebar()
@@ -129,14 +133,13 @@ try:
         .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }}
         .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
         .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
-        .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
         </style>
     """, unsafe_allow_html=True)
 
     st.title("ETHOS COMMAND")
     st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date.strftime('%A, %b %d')}")
 
-    # --- 5. GRID LAYOUT ---
+    # --- 5. GRID CONTENT ---
     r1_c1, r1_c2, r1_c3 = st.columns(3)
 
     class TaskSchema(BaseModel):
@@ -176,32 +179,8 @@ try:
                         <div style="background:#333; height:4px; border-radius:2px;"><div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>'''
         st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
-    r2_c1, r2_c2, r2_c3 = st.columns(3)
-
-    with r2_c1: # FINANCIAL CARD
-        fin_metrics = FinanceService.get_dashboard_metrics(user, t_date.strftime("%B %Y"))
-        st.markdown(f'''<div class="ethos-card"><div class="card-label">Financial: Budget & Debt</div>
-                    <div class="metric-val">₹ {fin_metrics.remaining_budget:,.0f}</div><div class="metric-sub">Remaining Budget</div>
-                    <div style="margin-top:25px;" class="metric-val" style="color:#ff4b4b;">₹ {fin_metrics.net_debt:,.0f}</div><div class="metric-sub">Net Liability</div></div>''', unsafe_allow_html=True)
-
-    with r2_c2: # NEURAL LOCK CARD
-        logs = FocusService.get_daily_logs(user, t_date)
-        content = ""
-        for row in (logs or [])[:6]:
-            safe_log_name = html.escape(row.task_name)
-            content += f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px;"><span>{safe_log_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
-
-    with r2_c3: # EVENTS CARD
-        events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 5", (user, t_date))
-        content = ""
-        for row in (events or []):
-            safe_evt = html.escape(row[0])
-            content += f'<div class="task-item"><div class="status-pip"></div><b>{row[1].strftime("%b %d")}</b>: {safe_evt}</div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
-
 except Exception as e:
     Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e), "page": "Home.py"})
-    st.error("ETHOS: A neural glitch occurred. Command Center is recalibrating.")
-    if st.button("RE-INITIALIZE SYSTEM"):
+    st.error("ETHOS: A neural glitch occurred. Recalibrating...")
+    if st.button("RE-INITIALIZE"):
         st.rerun()
