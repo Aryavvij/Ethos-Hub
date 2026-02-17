@@ -17,7 +17,10 @@ JWT_ALGO = "HS256"
 ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
-controller = CookieController()
+
+if 'controller' not in st.session_state:
+    st.session_state.controller = CookieController()
+controller = st.session_state.controller
 cookie_name = "ethos_user_token"
 
 # --- 2. AUTH UTILITIES ---
@@ -55,44 +58,55 @@ if not st.session_state.logged_in:
     except Exception:
         pass 
 
-# LOGIN SCREEN
+# --- LOGIN SCREEN ---
 if not st.session_state.logged_in:
-    st.markdown(f"""<style>div.stButton > button[kind="primary"] {{ background-color: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(118, 179, 114, 0.2) !important; color: white !important; border-radius: 8px !important; transition: all 0.3s ease !important; height: 3rem !important; }}</style>""", unsafe_allow_html=True)
+    st.markdown(f"""<style>
+        div.stButton > button[kind="primary"] {{ 
+            background-color: rgba(255, 255, 255, 0.05) !important; 
+            border: 1px solid {ETHOS_GREEN}77 !important; 
+            color: white !important; 
+            border-radius: 8px !important; 
+            height: 3.5rem !important;
+        }}
+    </style>""", unsafe_allow_html=True)
     
     st.title("ETHOS SYSTEM ACCESS")
     t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
     
     with t1:
-        e_in = st.text_input("Email", key="l_e", autocomplete="username")
-        p_in = st.text_input("Password", type='password', key="l_p", autocomplete="current-password")
-        
-        if st.button("INITIATE SESSION", use_container_width=True, type="primary"):
-            if not check_rate_limit(limit=5, window=60):
-                st.error("Too many attempts. System cooling down for 60s.")
-                Telemetry.log('SECURITY', 'Rate_Limit_Hit', metadata={'email': e_in})
-            else:
-                res = fetch_query("SELECT password FROM users WHERE email=%s", (e_in,))
-                if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                    Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
-                    st.session_state.logged_in = True
-                    st.session_state.user_email = e_in
-                    controller.set(cookie_name, create_jwt(e_in))
-                    
-                    last_page = controller.get("ethos_last_page")
-                    if last_page and last_page != "Home":
-                        controller.remove("ethos_last_page")
-                        st.switch_page(f"pages/{last_page}.py")
-                    else:
-                        st.rerun()
-                else: 
-                    Telemetry.log('AUTH', 'Login_Failure', metadata={'attempted_email': e_in})
-                    st.error("Wrong Password or Username")
+        with st.form("login_form", clear_on_submit=False):
+            e_in = st.text_input("Email", autocomplete="username")
+            p_in = st.text_input("Password", type='password', autocomplete="current-password")
+            submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
+            
+            if submit:
+                if not check_rate_limit(limit=5, window=60):
+                    st.error("Too many attempts. System cooling down.")
+                else:
+                    with st.status("Verifying Neural Link...", expanded=False) as status:
+                        # 1. Fetch user data
+                        res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
+                        
+                        if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
+                            status.update(label="Access Granted. Syncing...", state="complete")
+                            
+                            st.session_state.logged_in = True
+                            st.session_state.user_email = e_in
+                            st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
+                            
+                            controller.set(cookie_name, create_jwt(e_in))
+                            Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
+                            
+                            st.rerun()
+                        else: 
+                            status.update(label="Access Denied.", state="error")
+                            st.error("Invalid credentials.")
     
     with t2:
         st.info("Registration requires administrator clearance.")
     st.stop()
 
-# --- 4. DASHBOARD RENDERING (WITH GLOBAL ERROR BOUNDARY) ---
+# --- 4. DASHBOARD RENDERING (GLOBAL ERROR BOUNDARY) ---
 try:
     user = st.session_state.user_email
     render_sidebar()
@@ -107,27 +121,12 @@ try:
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(118, 179, 114, 0.15);
             border-radius: 12px;
-            padding: 22px;
-            margin-bottom: 20px;
-            height: 280px;
-            transition: 0.3s ease;
-            overflow-y: hidden;
+            padding: 22px; margin-bottom: 20px; height: 280px;
+            transition: 0.3s ease; overflow-y: hidden;
         }}
         .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
         .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
-        
-        .task-item {{ 
-            display: flex; 
-            align-items: center; 
-            margin-bottom: 8px; 
-            font-size: 14px; 
-        }}
-        
-        [data-testid="stVerticalBlock"] > div {{
-            padding-top: 0px !important;
-            gap: 0rem !important;
-        }}
-
+        .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }}
         .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
         .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
         .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
@@ -145,10 +144,9 @@ try:
         is_done: bool
 
     with r1_c1: # PROTOCOL CARD
-        with Telemetry.track_latency("Home_Protocol_Fetch"):
-            raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
+        raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
         content = ""
-        for row in raw_tasks[:5]:
+        for row in (raw_tasks or [])[:5]:
             try:
                 t = TaskSchema(name=row[0], is_done=row[1]) 
                 safe_name = html.escape(t.name) 
@@ -161,9 +159,8 @@ try:
         current_day_name = now.strftime('%A')
         t_time = now.strftime('%H:%M:%S')
         all_today = fetch_query("SELECT subject, start_time FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, current_day_name))
-        future_acts = [row for row in all_today if str(row[1]) >= t_time]
-        display_acts = future_acts[:5] if len(future_acts) >= 1 else all_today[-5:]
-        
+        future_acts = [row for row in (all_today or []) if str(row[1]) >= t_time]
+        display_acts = future_acts[:5] if len(future_acts) >= 1 else (all_today or [])[-5:]
         content = ""
         for row in display_acts:
             safe_sub = html.escape(str(row[0]))
@@ -173,7 +170,7 @@ try:
     with r1_c3: # BLUEPRINT CARD
         blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 4", (user,))
         content = ""
-        for desc, prog in blueprint:
+        for desc, prog in (blueprint or []):
             safe_desc = html.escape(desc[:20]) 
             content += f'''<div style="margin-bottom:15px;"><div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;"><span>{safe_desc.upper()}</span><span>{int(prog)}%</span></div>
                         <div style="background:#333; height:4px; border-radius:2px;"><div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>'''
@@ -190,7 +187,7 @@ try:
     with r2_c2: # NEURAL LOCK CARD
         logs = FocusService.get_daily_logs(user, t_date)
         content = ""
-        for row in logs[:6]:
+        for row in (logs or [])[:6]:
             safe_log_name = html.escape(row.task_name)
             content += f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px;"><span>{safe_log_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>'
         st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
@@ -198,19 +195,13 @@ try:
     with r2_c3: # EVENTS CARD
         events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 5", (user, t_date))
         content = ""
-        for row in events:
+        for row in (events or []):
             safe_evt = html.escape(row[0])
             content += f'<div class="task-item"><div class="status-pip"></div><b>{row[1].strftime("%b %d")}</b>: {safe_evt}</div>'
         st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 except Exception as e:
-    # GLOBAL RECOVERY LOGIC
-    error_details = {
-        "error": str(e),
-        "stack_trace": traceback.format_exc(),
-        "page": "Home.py"
-    }
-    Telemetry.log('ERROR', 'Global_System_Crash', metadata=error_details)
-    st.error("🛡️ ETHOS: A neural glitch occurred. Command Center is recalibrating.")
+    Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e), "page": "Home.py"})
+    st.error("ETHOS: A neural glitch occurred. Command Center is recalibrating.")
     if st.button("RE-INITIALIZE SYSTEM"):
         st.rerun()
