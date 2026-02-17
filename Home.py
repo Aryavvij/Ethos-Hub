@@ -8,7 +8,7 @@ from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
-from services.logic  import FocusService, FinanceService
+from services.services import FocusService, FinanceService
 from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
@@ -18,11 +18,11 @@ ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 
-@st.cache_resource
-def get_cookie_controller():
-    return CookieController()
+# FIX: Initialize the controller in session_state to avoid CachedWidgetWarning
+if 'controller' not in st.session_state:
+    st.session_state.controller = CookieController()
 
-controller = get_cookie_controller()
+controller = st.session_state.controller
 cookie_name = "ethos_user_token"
 
 # --- 2. AUTH UTILITIES ---
@@ -43,6 +43,7 @@ def verify_jwt(token):
 # --- 3. PERSISTENT AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
     try:
         all_cookies = controller.get_all()
@@ -76,6 +77,7 @@ if not st.session_state.logged_in:
     t1, t2 = st.tabs(["LOGIN", "SIGN UP"])
     
     with t1:
+        # Form prevents the "eternity" lag by stopping character-by-character refreshes
         with st.form("login_form", clear_on_submit=False):
             e_in = st.text_input("Email", autocomplete="username")
             p_in = st.text_input("Password", type='password', autocomplete="current-password")
@@ -86,6 +88,7 @@ if not st.session_state.logged_in:
                     st.error("Too many attempts. System cooling down.")
                 else:
                     with st.status("Verifying Neural Link...", expanded=False) as status:
+                        # Database check
                         res = fetch_query("SELECT password, role FROM users WHERE email=%s", (e_in,))
                         
                         if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
@@ -95,8 +98,8 @@ if not st.session_state.logged_in:
                             st.session_state.user_email = e_in
                             st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
                             
+                            # Write cookie & log
                             controller.set(cookie_name, create_jwt(e_in))
-                            
                             Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
                             
                             st.rerun()
@@ -203,7 +206,7 @@ try:
         st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 except Exception as e:
-    Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e)})
+    Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e), "page": "Home.py"})
     st.error("ETHOS: A neural glitch occurred. Command Center is recalibrating.")
     if st.button("RE-INITIALIZE SYSTEM"):
         st.rerun()
