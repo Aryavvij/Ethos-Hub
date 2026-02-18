@@ -9,6 +9,7 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 def get_connection_pool():
     """Create a single pool that lasts the entire app lifecycle."""
     try:
+        # Use a smaller pool (min 1, max 5) to avoid hitting DB limits
         return psycopg2.pool.SimpleConnectionPool(
             1, 5, DATABASE_URL, sslmode='require'
         )
