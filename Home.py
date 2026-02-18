@@ -2,6 +2,7 @@ import streamlit as st
 import hashlib
 import jwt
 import html
+import traceback
 from datetime import datetime as dt, timedelta
 from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
@@ -17,29 +18,31 @@ ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 
-# Initialize controller only once in session state
+# Initialize controller only if needed to prevent JS bloat
 if 'controller' not in st.session_state:
     st.session_state.controller = CookieController()
 controller = st.session_state.controller
+cookie_name = "ethos_user_token"
 
 # --- 2. AUTH UTILITIES ---
 def create_jwt(email):
     return jwt.encode({"email": email, "exp": dt.utcnow() + timedelta(days=30)}, JWT_SECRET, algorithm=JWT_ALGO)
 
-# --- 3. PERSISTENT AUTH FLOW ---
+# --- 3. PERSISTENT AUTHENTICATION FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# Skip cookie check if already logged in to save time
+# Quick Cookie Check (Non-blocking)
 if not st.session_state.logged_in:
     try:
         all_cookies = controller.get_all()
-        if all_cookies and "ethos_user_token" in all_cookies:
-            token = all_cookies.get("ethos_user_token")
+        if all_cookies and cookie_name in all_cookies:
+            token = all_cookies.get(cookie_name)
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-            st.session_state.logged_in = True
-            st.session_state.user_email = payload["email"]
-            st.rerun()
+            if payload and "email" in payload:
+                st.session_state.logged_in = True
+                st.session_state.user_email = payload["email"]
+                st.rerun()
     except:
         pass 
 
@@ -47,30 +50,27 @@ if not st.session_state.logged_in:
 if not st.session_state.logged_in:
     st.title("ETHOS SYSTEM ACCESS")
     
-    # Using a Form to block character-by-character reruns
-    with st.form("login_form"):
+    with st.form("login_form", clear_on_submit=False):
         e_in = st.text_input("Email", autocomplete="username")
         p_in = st.text_input("Password", type='password', autocomplete="current-password")
         submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
         
         if submit:
-            # Spinner is faster than status bar
+            # We use a simple spinner here for maximum speed
             with st.spinner("⚡ CONTACTING NEURAL SHARD..."):
-                # Single, optimized query
+                # Single, focused DB call to get the hash
                 res = fetch_query("SELECT password, role FROM users WHERE email=%s LIMIT 1", (e_in,))
                 
                 if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                    # 1. IMMEDIATE UI ESCALATION (Don't wait for logs)
+                    # 1. IMMEDIATE SESSION ESCALATION
                     st.session_state.logged_in = True
                     st.session_state.user_email = e_in
                     st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
                     
-                    # 2. ASYNC COOKIE SET
-                    controller.set("ethos_user_token", create_jwt(e_in))
+                    # 2. SET COOKIE (Don't wait for Telemetry)
+                    controller.set(cookie_name, create_jwt(e_in))
                     
-                    # 3. BACKGROUND LOGGING
-                    Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
-                    
+                    # 3. RERUN IMMEDIATELY
                     st.rerun()
                 else: 
                     st.error("Invalid credentials.")
@@ -86,6 +86,7 @@ try:
     d_idx = t_date.weekday()
     w_start = t_date - timedelta(days=d_idx)
 
+    # Global CSS
     st.markdown(f"""
         <style>
         .ethos-card {{
@@ -98,12 +99,11 @@ try:
         .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
         .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; color: white; }}
         .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
-        .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
         </style>
     """, unsafe_allow_html=True)
 
     st.title("ETHOS COMMAND")
-    st.caption(f"SYSTEM STATUS: ACTIVE | {t_date.strftime('%A, %b %d')}")
+    st.caption(f"CONNECTED: {user.upper()} | {t_date.strftime('%A, %b %d')}")
 
     # --- 5. GRID CONTENT ---
     r1_c1, r1_c2, r1_c3 = st.columns(3)
@@ -115,7 +115,7 @@ try:
             safe_name = html.escape(row[0]) 
             color = "gray" if row[1] else "white"
             content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{safe_name.upper()}</span></div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "Clear"}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "No tasks scheduled."}</div>', unsafe_allow_html=True)
 
     with r1_c2: # TIMELINE CARD
         current_day_name = now.strftime('%A')
@@ -124,7 +124,7 @@ try:
         for row in (all_today or []):
             safe_sub = html.escape(str(row[0]))
             content += f'<div class="task-item"><span style="color:{ETHOS_GREEN}; margin-right:10px;">{row[1]}</span> {safe_sub.upper()}</div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Current & Upcoming</div>{content or "No Activities"}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Schedule</div>{content or "No Activities"}</div>', unsafe_allow_html=True)
 
     with r1_c3: # BLUEPRINT CARD
         blueprint = fetch_query("SELECT task_description, progress FROM future_tasks WHERE user_email=%s AND progress < 100 ORDER BY progress DESC LIMIT 4", (user,))
@@ -133,9 +133,9 @@ try:
             safe_desc = html.escape(desc[:20]) 
             content += f'''<div style="margin-bottom:15px;"><div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;"><span>{safe_desc.upper()}</span><span>{int(prog)}%</span></div>
                         <div style="background:#333; height:4px; border-radius:2px;"><div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>'''
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>{content or "Clear"}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Progress</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 except Exception as e:
-    st.error("🛡️ ETHOS: A neural glitch occurred.")
+    st.error(f"🛡️ ETHOS: A neural glitch occurred.")
     if st.button("RE-INITIALIZE"):
         st.rerun()
