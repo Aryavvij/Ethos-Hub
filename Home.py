@@ -2,13 +2,12 @@ import streamlit as st
 import hashlib
 import jwt
 import html
-import traceback
 from datetime import datetime as dt, timedelta
 from database import fetch_query, execute_query
 from utils import render_sidebar, check_rate_limit 
 from streamlit_cookies_controller import CookieController
 from pydantic import BaseModel, ValidationError
-from services.logic import FocusService, FinanceService
+from services.services import FocusService, FinanceService
 from services.observability import Telemetry
 
 # --- 1. CONFIGURATION ---
@@ -18,81 +17,60 @@ ETHOS_GREEN = "#76b372"
 
 st.set_page_config(layout="wide", page_title="Ethos Hub", page_icon="🛡️")
 
-# Initialize controller in session state to prevent widget initialization lag
+# Initialize controller only once in session state
 if 'controller' not in st.session_state:
     st.session_state.controller = CookieController()
 controller = st.session_state.controller
-cookie_name = "ethos_user_token"
 
 # --- 2. AUTH UTILITIES ---
 def create_jwt(email):
     return jwt.encode({"email": email, "exp": dt.utcnow() + timedelta(days=30)}, JWT_SECRET, algorithm=JWT_ALGO)
 
-def verify_jwt(token):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
-        email = payload["email"]
-        exp_ts = payload.get('exp')
-        needs_refresh = (exp_ts - dt.utcnow().timestamp()) < (5 * 86400)
-        return email, needs_refresh
-    except: 
-        return None, False
-
-# --- 3. PERSISTENT AUTHENTICATION FLOW ---
+# --- 3. PERSISTENT AUTH FLOW ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# Quick Cookie Check (Only runs once)
+# Skip cookie check if already logged in to save time
 if not st.session_state.logged_in:
     try:
         all_cookies = controller.get_all()
-        if all_cookies and cookie_name in all_cookies:
-            token = all_cookies.get(cookie_name)
-            email, refresh_needed = verify_jwt(token)
-            if email:
-                st.session_state.logged_in = True
-                st.session_state.user_email = email
-                st.rerun()
-    except Exception:
+        if all_cookies and "ethos_user_token" in all_cookies:
+            token = all_cookies.get("ethos_user_token")
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+            st.session_state.logged_in = True
+            st.session_state.user_email = payload["email"]
+            st.rerun()
+    except:
         pass 
 
 # --- LOGIN SCREEN ---
 if not st.session_state.logged_in:
-    st.markdown(f"""<style>
-        div.stButton > button[kind="primary"] {{ 
-            background-color: rgba(255, 255, 255, 0.05) !important; 
-            border: 1px solid {ETHOS_GREEN}77 !important; 
-            color: white !important; 
-            border-radius: 8px !important; 
-            height: 3.5rem !important;
-        }}
-    </style>""", unsafe_allow_html=True)
-    
     st.title("ETHOS SYSTEM ACCESS")
     
-    # Form blocks character-by-character refreshing
-    with st.form("login_form", clear_on_submit=False):
+    # Using a Form to block character-by-character reruns
+    with st.form("login_form"):
         e_in = st.text_input("Email", autocomplete="username")
         p_in = st.text_input("Password", type='password', autocomplete="current-password")
         submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
         
         if submit:
-            # We use a simple spinner here because st.status adds overhead
-            with st.spinner("⚡ SYNCHRONIZING..."):
-                # Single, focused DB call
+            # Spinner is faster than status bar
+            with st.spinner("⚡ CONTACTING NEURAL SHARD..."):
+                # Single, optimized query
                 res = fetch_query("SELECT password, role FROM users WHERE email=%s LIMIT 1", (e_in,))
                 
                 if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                    # 1. IMMEDIATE STATE UPDATE (This makes it feel fast)
+                    # 1. IMMEDIATE UI ESCALATION (Don't wait for logs)
                     st.session_state.logged_in = True
                     st.session_state.user_email = e_in
                     st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
                     
-                    # 2. BACKGROUND TASKS (Cookie/Logs)
-                    controller.set(cookie_name, create_jwt(e_in))
+                    # 2. ASYNC COOKIE SET
+                    controller.set("ethos_user_token", create_jwt(e_in))
+                    
+                    # 3. BACKGROUND LOGGING
                     Telemetry.log('AUTH', 'Login_Success', metadata={'user': e_in})
                     
-                    # 3. GO!
                     st.rerun()
                 else: 
                     st.error("Invalid credentials.")
@@ -115,47 +93,35 @@ try:
             border: 1px solid rgba(118, 179, 114, 0.15);
             border-radius: 12px;
             padding: 22px; margin-bottom: 20px; height: 280px;
-            transition: 0.3s ease; overflow: hidden;
+            overflow: hidden;
         }}
-        .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
         .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
         .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; color: white; }}
         .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
         .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
-        .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
         </style>
     """, unsafe_allow_html=True)
 
     st.title("ETHOS COMMAND")
-    st.caption(f"SYSTEM STATUS: ACTIVE | {now.strftime('%H:%M:%S')} | {t_date.strftime('%A, %b %d')}")
+    st.caption(f"SYSTEM STATUS: ACTIVE | {t_date.strftime('%A, %b %d')}")
 
     # --- 5. GRID CONTENT ---
     r1_c1, r1_c2, r1_c3 = st.columns(3)
 
-    class TaskSchema(BaseModel):
-        name: str
-        is_done: bool
-
     with r1_c1: # PROTOCOL CARD
-        raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s", (user, d_idx, w_start))
+        raw_tasks = fetch_query("SELECT task_name, is_done FROM weekly_planner WHERE user_email=%s AND day_index=%s AND week_start=%s LIMIT 5", (user, d_idx, w_start))
         content = ""
-        for row in (raw_tasks or [])[:5]:
-            try:
-                t = TaskSchema(name=row[0], is_done=row[1]) 
-                safe_name = html.escape(t.name) 
-                color = "gray" if t.is_done else "white"
-                content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{safe_name.upper()}</span></div>'
-            except ValidationError: continue
+        for row in (raw_tasks or []):
+            safe_name = html.escape(row[0]) 
+            color = "gray" if row[1] else "white"
+            content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{safe_name.upper()}</span></div>'
         st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
     with r1_c2: # TIMELINE CARD
         current_day_name = now.strftime('%A')
-        t_time = now.strftime('%H:%M:%S')
-        all_today = fetch_query("SELECT subject, start_time FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC", (user, current_day_name))
-        future_acts = [row for row in (all_today or []) if str(row[1]) >= t_time]
-        display_acts = future_acts[:5] if len(future_acts) >= 1 else (all_today or [])[-5:]
+        all_today = fetch_query("SELECT subject, start_time FROM timetable WHERE user_email=%s AND day_name=%s ORDER BY start_time ASC LIMIT 5", (user, current_day_name))
         content = ""
-        for row in display_acts:
+        for row in (all_today or []):
             safe_sub = html.escape(str(row[0]))
             content += f'<div class="task-item"><span style="color:{ETHOS_GREEN}; margin-right:10px;">{row[1]}</span> {safe_sub.upper()}</div>'
         st.markdown(f'<div class="ethos-card"><div class="card-label">Timeline: Current & Upcoming</div>{content or "No Activities"}</div>', unsafe_allow_html=True)
@@ -169,32 +135,7 @@ try:
                         <div style="background:#333; height:4px; border-radius:2px;"><div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>'''
         st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
-    r2_c1, r2_c2, r2_c3 = st.columns(3)
-
-    with r2_c1: # FINANCIAL CARD
-        fin_metrics = FinanceService.get_dashboard_metrics(user, t_date.strftime("%B %Y"))
-        st.markdown(f'''<div class="ethos-card"><div class="card-label">Financial: Budget & Debt</div>
-                    <div class="metric-val">₹ {fin_metrics.remaining_budget:,.0f}</div><div class="metric-sub">Remaining Budget</div>
-                    <div style="margin-top:25px;" class="metric-val" style="color:#ff4b4b;">₹ {fin_metrics.net_debt:,.0f}</div><div class="metric-sub">Net Liability</div></div>''', unsafe_allow_html=True)
-
-    with r2_c2: # NEURAL LOCK CARD
-        logs = FocusService.get_daily_logs(user, t_date)
-        content = ""
-        for row in (logs or [])[:6]:
-            safe_log_name = html.escape(row.task_name)
-            content += f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px;"><span>{safe_log_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
-
-    with r2_c3: # EVENTS CARD
-        events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 5", (user, t_date))
-        content = ""
-        for row in (events or []):
-            safe_evt = html.escape(row[0])
-            content += f'<div class="task-item"><div class="status-pip"></div><b>{row[1].strftime("%b %d")}</b>: {safe_evt}</div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
-
 except Exception as e:
-    Telemetry.log('ERROR', 'Global_System_Crash', metadata={"error": str(e)})
-    st.error("ETHOS: A neural glitch occurred. Command Center is recalibrating.")
-    if st.button("RE-INITIALIZE SYSTEM"):
+    st.error("🛡️ ETHOS: A neural glitch occurred.")
+    if st.button("RE-INITIALIZE"):
         st.rerun()
