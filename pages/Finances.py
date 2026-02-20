@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import calendar
 from database import execute_query, fetch_query
-from services.services import invalidate_user_caches
+from services.logic import invalidate_user_caches
 from datetime import datetime
 from utils import render_sidebar
 
