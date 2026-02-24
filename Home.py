@@ -32,7 +32,6 @@ def create_jwt(email):
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# Quick Cookie Check (Non-blocking)
 if not st.session_state.logged_in:
     try:
         all_cookies = controller.get_all()
@@ -56,21 +55,14 @@ if not st.session_state.logged_in:
         submit = st.form_submit_button("INITIATE SESSION", use_container_width=True)
         
         if submit:
-            # We use a simple spinner here for maximum speed
             with st.spinner("⚡ CONTACTING NEURAL SHARD..."):
-                # Single, focused DB call to get the hash
                 res = fetch_query("SELECT password, role FROM users WHERE email=%s LIMIT 1", (e_in,))
                 
                 if res and res[0][0] == hashlib.sha256(p_in.encode()).hexdigest():
-                    # 1. IMMEDIATE SESSION ESCALATION
                     st.session_state.logged_in = True
                     st.session_state.user_email = e_in
                     st.session_state.role = res[0][1] if len(res[0]) > 1 else "user"
-                    
-                    # 2. SET COOKIE (Don't wait for Telemetry)
                     controller.set(cookie_name, create_jwt(e_in))
-                    
-                    # 3. RERUN IMMEDIATELY
                     st.rerun()
                 else: 
                     st.error("Invalid credentials.")
@@ -86,7 +78,7 @@ try:
     d_idx = t_date.weekday()
     w_start = t_date - timedelta(days=d_idx)
 
-    # Global CSS
+    # CSS for Neural Cards
     st.markdown(f"""
         <style>
         .ethos-card {{
@@ -95,17 +87,21 @@ try:
             border-radius: 12px;
             padding: 22px; margin-bottom: 20px; height: 280px;
             overflow: hidden;
+            transition: 0.3s ease;
         }}
+        .ethos-card:hover {{ border-color: {ETHOS_GREEN}; background: rgba(118, 179, 114, 0.05); }}
         .card-label {{ color: {ETHOS_GREEN}; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; }}
         .task-item {{ display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; color: white; }}
         .status-pip {{ height: 6px; width: 6px; background-color: {ETHOS_GREEN}; border-radius: 50%; margin-right: 12px; }}
+        .metric-val {{ font-size: 24px; font-weight: 700; color: white; }}
+        .metric-sub {{ font-size: 11px; color: #888; text-transform: uppercase; }}
         </style>
     """, unsafe_allow_html=True)
 
     st.title("ETHOS COMMAND")
     st.caption(f"CONNECTED: {user.upper()} | {t_date.strftime('%A, %b %d')}")
 
-    # --- 5. GRID CONTENT ---
+    # --- ROW 1 ---
     r1_c1, r1_c2, r1_c3 = st.columns(3)
 
     with r1_c1: # PROTOCOL CARD
@@ -115,7 +111,7 @@ try:
             safe_name = html.escape(row[0]) 
             color = "gray" if row[1] else "white"
             content += f'<div class="task-item"><div class="status-pip"></div><span style="color:{color}">{safe_name.upper()}</span></div>'
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "No tasks scheduled."}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Work: Today\'s Tasks</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
     with r1_c2: # TIMELINE CARD
         current_day_name = now.strftime('%A')
@@ -133,9 +129,37 @@ try:
             safe_desc = html.escape(desc[:20]) 
             content += f'''<div style="margin-bottom:15px;"><div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;"><span>{safe_desc.upper()}</span><span>{int(prog)}%</span></div>
                         <div style="background:#333; height:4px; border-radius:2px;"><div style="background:{ETHOS_GREEN}; width:{prog}%; height:4px; border-radius:2px;"></div></div></div>'''
-        st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Progress</div>{content or "Clear"}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Blueprint: Future Path</div>{content or "Clear"}</div>', unsafe_allow_html=True)
+
+    # --- ROW 2 (THE RESTORED BOXES) ---
+    r2_c1, r2_c2, r2_c3 = st.columns(3)
+
+    with r2_c1: # FINANCIAL CARD
+        fin_metrics = FinanceService.get_dashboard_metrics(user, t_date.strftime("%B %Y"))
+        st.markdown(f'''<div class="ethos-card"><div class="card-label">Financial: Budget & Debt</div>
+                    <div class="metric-val">₹ {fin_metrics.remaining_budget:,.0f}</div><div class="metric-sub">Remaining Budget</div>
+                    <div style="margin-top:25px;" class="metric-val" style="color:#ff4b4b;">₹ {fin_metrics.net_debt:,.0f}</div><div class="metric-sub">Net Liability</div></div>''', unsafe_allow_html=True)
+
+    with r2_c2: # NEURAL LOCK (FOCUS) CARD
+        logs = FocusService.get_daily_logs(user, t_date)
+        content = ""
+        for row in (logs or [])[:6]:
+            safe_log_name = html.escape(row.task_name)
+            content += f'<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px;"><span>{safe_log_name.upper()}</span><span style="color:{ETHOS_GREEN};">{row.duration_mins}m</span></div>'
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Neural Lock: Output Today</div>{content or "No focus logs"}</div>', unsafe_allow_html=True)
+
+    with r2_c3: # EVENTS CARD
+        events = fetch_query("SELECT description, event_date FROM events WHERE user_email=%s AND event_date >= %s ORDER BY event_date ASC LIMIT 5", (user, t_date))
+        content = ""
+        for row in (events or []):
+            safe_evt = html.escape(row[0])
+            content += f'<div class="task-item"><div class="status-pip"></div><b>{row[1].strftime("%b %d")}</b>: {safe_evt}</div>'
+        st.markdown(f'<div class="ethos-card"><div class="card-label">Calendar: Upcoming Events</div>{content or "Clear"}</div>', unsafe_allow_html=True)
 
 except Exception as e:
-    st.error(f"🛡️ ETHOS: A neural glitch occurred.")
+    # Error telemetry for troubleshooting
+    error_details = {"error": str(e), "stack_trace": traceback.format_exc()}
+    Telemetry.log('ERROR', 'Home_Render_Failure', metadata=error_details)
+    st.error(f"ETHOS: A neural glitch occurred.")
     if st.button("RE-INITIALIZE"):
         st.rerun()
