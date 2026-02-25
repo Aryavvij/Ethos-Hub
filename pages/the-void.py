@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 
 # Set page config for proper scaling
 st.set_page_config(
-    page_title="The Void — ETHOS HUB",
+    page_title="The Void",
     page_icon="🌌",
     layout="wide",
     initial_sidebar_state="collapsed"
