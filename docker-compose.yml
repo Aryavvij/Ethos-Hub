@@ -1,11 +1,35 @@
 version: '3.8'
+
 services:
-  ethos_app:
+  db:
+    image: postgres:15
+    container_name: ethos_db_local
+    restart: always
+    environment:
+      POSTGRES_USER: ethos_admin
+      POSTGRES_PASSWORD: local_password
+      POSTGRES_DB: ethos_hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
     build: .
-    container_name: ethos_container
+    container_name: ethos_app_local
     ports:
       - "8501:8501"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DB_HOST=db
+      - DB_NAME=ethos_hub
+      - DB_USER=ethos_admin
+      - DB_PASS=local_password
+      - EDAMAM_ID=${EDAMAM_ID}
+      - EDAMAM_KEY=${EDAMAM_KEY}
+    depends_on:
+      - db
     volumes:
       - .:/app
+
+volumes:
+  postgres_data:
